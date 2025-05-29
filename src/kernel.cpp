@@ -40,7 +40,9 @@ extern "C" void primary_kernel_init() {
 
 void kernel_init(){
     // will get race conditions here, in order to create locks, we will need the mmu enables to run atomic instruction, which is the next part
-    printf("Hi, I'm core %d\n", getCoreID());
+    uint64_t value = 0x123456789ABCDEF0ULL;
+    printf("64-bit value: 0x%llx\n", value);
+    printf("Hi, I'm core %d. My SP is: %llx\n", getCoreID(), get_sp());
     printf("in EL: %d\n", get_el());
 }
 
