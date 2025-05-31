@@ -4,7 +4,7 @@ CURRENT_OS = $(strip $(shell uname -s))  # semi portable ig.
 ifeq ($(findstring Darwin,$(CURRENT_OS)),Darwin) # MACOS
     CROSS_COMPILE = aarch64-elf-
 else
-    CROSS_COMPILE = aarch64-linux-gnu-
+    CROSS_COMPILE = aarch64-none-elf-
 endif
 
 AS = $(CROSS_COMPILE)as
@@ -40,10 +40,7 @@ CFLAGS  = -Wall -Wextra -nostdlib -ffreestanding \
           -fno-rtti -fno-exceptions
 LDFLAGS = -T linker.ld  # Use the custom linker script
 
-QEMU_ARGS = -M raspi3b -kernel $(KERNEL_IMG) -smp 4 \
-            -serial stdio -usb -device usb-net,netdev=net0 \
-            -netdev user,id=net0 -device usb-mouse \
-            -device usb-kbd -drive file=sdcard.dd,if=sd,format=raw
+QEMU_ARGS = -M raspi3b -kernel $(KERNEL_IMG) -smp 4 -serial stdio
 
 # Build rules
 all: $(KERNEL_IMG)
