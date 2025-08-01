@@ -27,6 +27,6 @@ getCoreID:
 	ret
 
 .global get_sp
-get_sp:
+    get_sp:
     mov x0, sp
     ret

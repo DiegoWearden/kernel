@@ -1,5 +1,6 @@
 #include "arm/sysregs.h"
- #include "mm.h"
+#include "mm.h"
+#include "vm.h"
  
  .section ".text.boot"
  _start:	
@@ -109,18 +110,39 @@
     bl secondary_kernel_init
     b proc_hang
  
- .global wake_up_cores
- wake_up_cores:
-     mov x0, #0
-     adr x0, setup_el1_for_secondary
-     mov x1, #0xe0
-     str x0, [x1]
-     mov x1, #0xe8
-     str x0, [x1]
-     mov x1, #0xf0
-     str x0, [x1]
-     sev
-     ret
+.global wake_up_cores
+wake_up_cores:
+    
+    mov x0, #0
+    adr x0, setup_el1_for_secondary 
+    ldr x4, =(VA_START)
+    sub x0, x0, x4
+
+    dsb sy
+    isb
+
+    mov x1, #0xe0
+    str x0, [x1]
+    mov x1, #0xe8
+    str x0, [x1]
+    mov x1, #0xf0
+    str x0, [x1]
+
+    // we wrote to addresses 0xe0, 0xe8, and 0xf0, we must now write them back to memory since 
+    // primary core has data cache on at this point
+    movz x0, #0xe0
+    dc cvac, x0
+    movz x0, #0xe8
+    dc cvac, x0
+    movz x0, #0xf0
+    dc cvac, x0
+    
+    dsb sy
+    isb
+    
+    sev
+    
+    ret
  
      // important, code has to be properly aligned
      .align 11

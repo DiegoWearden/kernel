@@ -1,10 +1,22 @@
 SECTIONS
 {
-    . = 0x80000;
+    . = 0xffff000000080000;
     .text : { KEEP(*(.text.boot)) *(.text .text.* .gnu.linkonce.t*) }
     .rodata : { *(.rodata .rodata.* .gnu.linkonce.r*) }
     PROVIDE(_data = .);
     .data : { *(.data .data.* .gnu.linkonce.d*) }
+
+    .paging : ALIGN(4096) {
+        __paging_start = .;
+        *(.paging)  /* Collect all .paging section variables */
+        __paging_end = .;
+    }
+
+    .stacks : ALIGN(16) {
+        __stacks_start = .;
+        *(.stacks)
+        __stacks_end = .;
+    }
 
     .bss (NOLOAD) : {
         . = ALIGN(16);
