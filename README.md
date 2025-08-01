@@ -1,5 +1,5 @@
-# OStrich
-Distributed OS
+# ASDOS
+A monolithic kernel
 
 ## Prerequisites
 
