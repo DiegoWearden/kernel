@@ -10,7 +10,7 @@ uint64_t PMD_arm[512] __attribute__((aligned(4096), section(".paging")));
 
 // L3 Page Tables (NEW) - We'll need multiple PTE tables
 // Each PMD entry can point to a PTE table that maps 512 * 4KB = 2MB
-#define MAX_PTE_TABLES 64  // Support up to 64 PTE tables (128MB of fine-grained mappings)
+#define MAX_PTE_TABLES 128  // Support up to 128 PTE tables (256MB of fine-grained mappings)
 #define MAX_PMD_TABLES 16  // Support additional PMD tables for arbitrary mappings
 uint64_t PTE_tables[MAX_PTE_TABLES][512] __attribute__((aligned(4096), section(".paging")));
 uint64_t PMD_extra[MAX_PMD_TABLES][512] __attribute__((aligned(4096), section(".paging")));
@@ -269,8 +269,105 @@ bool map_range(uint64_t virt_start, uint64_t phys_start, uint64_t size, uint64_t
 }
 
 /**
+ * Map a range while excluding dangerous null addresses but preserving mailbox registers
+ * This helps catch null pointer dereferences while keeping system functionality
+ */
+bool map_range_skip_null(uint64_t virt_start, uint64_t phys_start, uint64_t size, uint64_t attrs, bool force_4kb) {
+    uint64_t virt_addr = virt_start;
+    uint64_t phys_addr = phys_start;
+    uint64_t remaining = size;
+    
+    while (remaining > 0) {
+        // Skip the dangerous null region (0x0-0x7F) but allow mailbox registers (0x80+)
+        // Mailbox registers are at 0xe0, 0xe8, 0xf0 and must remain accessible
+        if (virt_addr < 0x80) {
+            // Skip mapping the dangerous null region (first 128 bytes)
+            uint64_t skip_size = 0x80 - virt_addr;
+            if (skip_size > remaining) skip_size = remaining;
+            virt_addr += skip_size;
+            phys_addr += skip_size;
+            remaining -= skip_size;
+            continue;
+        }
+        
+        // Check if we can use a 2MB block (more efficient)
+        bool can_use_2mb = !force_4kb && 
+                          remaining >= PAGE_SIZE_2MB &&
+                          (virt_addr & (PAGE_SIZE_2MB - 1)) == 0 &&  // 2MB aligned virtual
+                          (phys_addr & (PAGE_SIZE_2MB - 1)) == 0;    // 2MB aligned physical
+        
+        if (can_use_2mb) {
+            // Use 2MB block
+            if (!map_address(virt_addr, phys_addr, PAGE_SIZE_2MB, attrs)) {
+                return false;
+            }
+            virt_addr += PAGE_SIZE_2MB;
+            phys_addr += PAGE_SIZE_2MB;
+            remaining -= PAGE_SIZE_2MB;
+        } else {
+            // Use 4KB page
+            if (remaining < PAGE_SIZE_4KB) {
+                return false;  // Can't map less than 4KB
+            }
+            if (!map_address(virt_addr, phys_addr, PAGE_SIZE_4KB, attrs)) {
+                return false;
+            }
+            virt_addr += PAGE_SIZE_4KB;
+            phys_addr += PAGE_SIZE_4KB;
+            remaining -= PAGE_SIZE_4KB;
+        }
+    }
+    
+    return true;
+}
+
+/**
+ * Enable null pointer protection by unmapping the first 4KB page
+ * Call this AFTER all cores have booted and mailbox registers are no longer needed
+ */
+void enable_null_pointer_protection() {
+    printf("=== Enabling Null Pointer Protection ===\n");
+    
+    // Find the PTE table for the first 2MB region
+    // PMD[0] should point to a PTE table (not a 2MB block)
+    if (PMD[0] & PTE_TABLE) {
+        uint64_t pte_table_addr = PMD[0] & ~0xFFF;
+        uint64_t* pte_table = (uint64_t*)pte_table_addr;
+        
+        // Unmap page 0 (0x0000-0x0FFF) which contains the null pointer region
+        printf("Unmapping page 0 (0x0000-0x0FFF) for null pointer protection...\n");
+        pte_table[0] = 0;  // Clear the PTE entry for page 0
+        
+        // Invalidate TLB to ensure the change takes effect
+        asm volatile("tlbi vmalle1is");
+        asm volatile("dsb ish");
+        asm volatile("isb");
+        
+        printf("✅ Null pointer protection enabled!\n");
+        printf("   - Address 0x0000-0x0FFF: UNMAPPED (will cause page fault)\n");
+        printf("   - Address 0x1000+: Still accessible\n");
+    } else {
+        printf("❌ Cannot enable null protection: PMD[0] is not a PTE table\n");
+    }
+    
+    printf("=========================================\n\n");
+}
+
+/**
+ * Print information about null page protection
+ */
+void print_null_page_info() {
+    printf("=== Null Page Protection Details ===\n");
+    printf("Protection: Delayed until after core boot\n");
+    printf("Range: 0x0000-0x0FFF (first 4KB page)\n");
+    printf("Effect: Null pointer dereferences cause page faults\n");
+    printf("Implementation: Unmap page 0 after cores are running\n");
+    printf("=========================================\n\n");
+}
+
+/**
  * Demo function showing how easy it is to map memory regions
- * Now with 4KB page support!
+ * Now with 4KB page support and null page protection!
  */
 void demo_mapping_functions() {
     // Example 1: Map a single 2MB region (block mapping)
@@ -333,10 +430,26 @@ void create_page_tables_cpp() {
     // ===== MAP MEMORY REGIONS =====
     
     // Map low address space (0x0 - 0x40000000) - identity mapping
+    // Use 4KB pages for first 256MB (128 PTE tables), 2MB blocks for the rest
+    // IMPORTANT: Skip mapping the null region (0x0-0x7F) to catch null pointer dereferences
     for (int i = 0; i < 512; i++) {
-        uint64_t virt_addr = (uint64_t)i << 21;  // 2MB blocks
+        uint64_t virt_addr = (uint64_t)i << 21;  // 2MB regions
         uint64_t phys_addr = virt_addr;  // Identity mapping
-        map_address(virt_addr, phys_addr, PAGE_SIZE_2MB);
+        
+        if (i < 128) {
+            // Use 4KB pages for first 256MB (can demonstrate fine-grained control)
+            if (i == 0) {
+                // For now, map first 2MB region normally during boot
+                // Null protection will be enabled later after cores are up
+                map_range(virt_addr, phys_addr, PAGE_SIZE_2MB, 0, true);  // force_4kb = true
+            } else {
+                // Normal mapping for other regions
+                map_address(virt_addr, phys_addr, PAGE_SIZE_2MB);  // force_4kb = true
+            }
+        } else {
+            // Use 2MB blocks for remaining 768MB (more efficient)
+            map_address(virt_addr, phys_addr, PAGE_SIZE_2MB);
+        }
     }
     
     // Map high address space (0x40000000+) - device memory
@@ -345,8 +458,6 @@ void create_page_tables_cpp() {
         uint64_t phys_addr = 0x40000000 + ((uint64_t)i << 21);  // Identity mapping for device memory
         map_address(virt_addr, phys_addr, PAGE_SIZE_2MB, PTE_AP_RW | PTE_ATTRINDX_DEVICE);
     }
-    
-    // PMD[71] = 0x8c00711;
     
     // Map each 2MB block in the upper address space (device memory)
     for (int i = 0; i < 512; i++) {

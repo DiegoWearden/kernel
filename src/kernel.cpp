@@ -17,6 +17,8 @@ struct Stack {
 PerCPU<Stack> stacks;
 
 static bool smpInitDone = false;
+static bool null_protection_enabled = false;
+
 
 void kernel_init();
 
@@ -64,6 +66,7 @@ void dump_null_region_mapping_explicit(uint64_t start, uint64_t end, uint64_t st
 
 
 extern "C" void secondary_kernel_init(){
+    while(!null_protection_enabled);
     init_mmu();
     kernel_init();
 }
@@ -80,14 +83,21 @@ extern "C" void primary_kernel_init() {
     smpInitDone = true;
     clean_dcache_line(&smpInitDone);
     wake_up_cores();
+    enable_null_pointer_protection();
+    null_protection_enabled = true;
+    clean_dcache_line(&null_protection_enabled);
     kernel_init();
 }
 
 void kernel_init(){
-    lock.lock();
-    printf("Hi, I'm core %d\n", getCoreID());
-    printf("in EL: %d\n", get_el());
-    printf("Stack Pointer: %llx\n", get_sp());
-    lock.unlock();
+
+
+if(getCoreID() == 1){
+    __asm__ volatile("brk #0");
+
+    volatile uint32_t* null_ptr = (volatile uint32_t*)0x0;
+    printf("Core %d Attempting to write to null pointer (0x0)...\n", getCoreID());
+    *null_ptr = 0xDEADBEEF;  // This should trigger page 
+}
 }
 
