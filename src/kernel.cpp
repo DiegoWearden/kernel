@@ -90,14 +90,29 @@ extern "C" void primary_kernel_init() {
 }
 
 void kernel_init(){
-
-
-if(getCoreID() == 1){
-    __asm__ volatile("brk #0");
-
-    volatile uint32_t* null_ptr = (volatile uint32_t*)0x0;
-    printf("Core %d Attempting to write to null pointer (0x0)...\n", getCoreID());
-    *null_ptr = 0xDEADBEEF;  // This should trigger page 
-}
+    lock.lock();
+    printf("Hi, I'm core %d\n", getCoreID());
+    printf("in EL: %d\n", get_el());
+    printf("Stack Pointer: %llx\n", get_sp());
+    lock.unlock();
+    if(getCoreID() == 0){
+        uint64_t* null_ptr = (uint64_t*)0x0;
+        *null_ptr = 0xDEADBEEF;
+    }
+    if(getCoreID() == 1){
+        uint64_t* null_ptr = (uint64_t*)0xf0;
+        *null_ptr = 0xDEADBEEF;
+    }
+    if(getCoreID() == 2){
+        uint64_t* null_ptr = (uint64_t*)0xef;
+        *null_ptr = 0xDEADBEEF;
+    }
+    if(getCoreID() == 3){
+        uint64_t* null_ptr = (uint64_t*)0xe0;
+        *null_ptr = 0xDEADBEEF;
+    }
+    while(true) {
+        asm volatile("wfe");
+    }
 }
 

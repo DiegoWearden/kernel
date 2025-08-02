@@ -328,28 +328,36 @@ bool map_range_skip_null(uint64_t virt_start, uint64_t phys_start, uint64_t size
 void enable_null_pointer_protection() {
     printf("=== Enabling Null Pointer Protection ===\n");
     
-    // Find the PTE table for the first 2MB region
-    // PMD[0] should point to a PTE table (not a 2MB block)
     if (PMD[0] & PTE_TABLE) {
         uint64_t pte_table_addr = PMD[0] & ~0xFFF;
         uint64_t* pte_table = (uint64_t*)pte_table_addr;
         
-        // Unmap page 0 (0x0000-0x0FFF) which contains the null pointer region
+        printf("Before: PTE[0] = 0x%016llx\n", pte_table[0]);
         printf("Unmapping page 0 (0x0000-0x0FFF) for null pointer protection...\n");
+        
         pte_table[0] = 0;  // Clear the PTE entry for page 0
         
-        // Invalidate TLB to ensure the change takes effect
+        printf("After: PTE[0] = 0x%016llx\n", pte_table[0]);
+        
+        // Stronger cache and TLB invalidation for hardware compatibility
+        asm volatile("dc civac, %0" :: "r"(pte_table) : "memory");
+        asm volatile("dc civac, %0" :: "r"(&pte_table[0]) : "memory");
+        asm volatile("dsb sy");
         asm volatile("tlbi vmalle1is");
-        asm volatile("dsb ish");
+        asm volatile("dsb sy");
         asm volatile("isb");
         
-        printf("✅ Null pointer protection enabled!\n");
+        printf("Null pointer protection enabled!\n");
         printf("   - Address 0x0000-0x0FFF: UNMAPPED (will cause page fault)\n");
         printf("   - Address 0x1000+: Still accessible\n");
+        
+        // Verify the change took effect
+        printf("Verification: PTE[0] = 0x%016llx\n", pte_table[0]);
+        
     } else {
-        printf("❌ Cannot enable null protection: PMD[0] is not a PTE table\n");
+        printf("Cannot enable null protection: PMD[0] is not a PTE table\n");
+        printf("PMD[0] = 0x%016llx\n", PMD[0]);
     }
-    
     printf("=========================================\n\n");
 }
 
@@ -499,4 +507,19 @@ void patch_page_tables() {
         PMD_arm[i] = PMD_arm[i] & (~0xFFF);
         PMD_arm[i] = PMD_arm[i] | DEVICE_LOWER_ATTRIBUTES;
     }
+}
+
+// Add a function to check if address is mapped using translation registers
+void check_address_mapping(uint64_t addr) {
+    // Use AT S1E1W (Address Translate Stage 1 EL1 Write) to check mapping
+    asm volatile("at s1e1w, %0" :: "r"(addr));
+    asm volatile("isb");
+    
+    uint64_t par;
+    asm volatile("mrs %0, par_el1" : "=r"(par));
+    
+    bool is_faulted = par & 1;  // bit 0 = 1 means translation faulted
+    
+    printf("Address 0x%016llx: %s (PAR_EL1=0x%016llx)\n", 
+           addr, is_faulted ? "UNMAPPED" : "MAPPED", par);
 }
