@@ -77,7 +77,7 @@ static uint64_t* allocate_pmd_table() {
 
 // Helper function to determine memory attributes for a physical address        
 static inline uint64_t get_memory_attributes(uint64_t phys_addr) {
-    if (phys_addr >= 0x3F000000) { // perihperals + device memory (0x3F000000 - 0x40000000 and 0x40000000+)
+    if (phys_addr >= 0x3F000000) { // perihperals + arm device memory (0x3F000000 - 0x40000000 and 0x40000000+)
         return PTE_AP_RW | PTE_UXN | PTE_PXN | PTE_ATTRINDX_DEVICE;
     }
 
