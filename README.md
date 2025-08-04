@@ -1,5 +1,6 @@
 # ASDOS
 A monolithic kernel
+Distributed OS
 
 ## Prerequisites
 
