@@ -125,6 +125,7 @@ bool map_address_2mb(uint64_t virt_addr, uint64_t phys_addr, uint64_t attrs) {
 
 
     if (!(pud_table[pud_index] & PTE_VALID)) {
+        // might change this to use the pre allocated PMD tables
         if (pud_index == 0) {
             pmd_table = PMD;
         } else if (pud_index == 1) {
@@ -176,6 +177,7 @@ bool map_address_4kb(uint64_t virt_addr, uint64_t phys_addr, uint64_t attrs) {
     uint64_t* pmd_table = (uint64_t*)(pud_table[pud_index] & ~0xFFFULL);
 
     if (pmd_table[pmd_index] & PTE_VALID && !(pmd_table[pmd_index] & PTE_TABLE)) {
+        printf("Error: page already mapped\n");
         return false;
     }
 
@@ -190,6 +192,7 @@ bool map_address_4kb(uint64_t virt_addr, uint64_t phys_addr, uint64_t attrs) {
         pmd_table[pmd_index] = create_table_descriptor((uint64_t)pte_table);
     } else {
         if (!(pmd_table[pmd_index] & PTE_TABLE)) {
+            printf("Error: page already mapped\n");
             return false;
         }
         pte_table = (uint64_t*)(pmd_table[pmd_index] & ~0xFFFULL);
@@ -200,12 +203,63 @@ bool map_address_4kb(uint64_t virt_addr, uint64_t phys_addr, uint64_t attrs) {
     return true;
 }
 
+bool unmap_address(uint64_t virt_addr) {
+    uint64_t pgd_index = (virt_addr >> 39) & 0x1FF;
+    uint64_t pud_index = (virt_addr >> 30) & 0x1FF;
+    uint64_t pmd_index = (virt_addr >> 21) & 0x1FF;
+    uint64_t pte_index = (virt_addr >> 12) & 0x1FF;
+
+    // Level 0
+    if (!(PGD[pgd_index] & PTE_VALID))
+        return false; // nothing mapped
+
+    uint64_t* pud_table = (uint64_t*)(PGD[pgd_index] & ~0xFFF);
+    if (!(pud_table[pud_index] & PTE_VALID))
+        return false;
+
+    // Level 1
+    uint64_t* pmd_table = (uint64_t*)(pud_table[pud_index] & ~0xFFF);
+    uint64_t pmd_entry = pmd_table[pmd_index];
+    if (!(pmd_entry & PTE_VALID))
+        return false;
+
+    if ((pmd_entry & PTE_TABLE) == 0) {
+        pmd_table[pmd_index] = 0;
+        asm volatile("dc civac, %0" :: "r"(pmd_table) : "memory");
+    } else {
+        uint64_t* pte_table = (uint64_t*)(pmd_entry & ~0xFFF);
+        if (!(pte_table[pte_index] & PTE_VALID))
+            return false;
+
+        pte_table[pte_index] = 0;
+
+        // if the entire PTE table is now empty, you could
+        // reclaim it and clear the PMD entry too (needs a free list to reuse).
+        bool empty = true;
+        for (int i = 0; i < 512; i++) {
+            if (pte_table[i]) {
+                empty = false;
+                break;
+            }
+        }
+        asm volatile("dc civac, %0" :: "r"(pte_table) : "memory");
+        if (empty) {
+            pmd_table[pmd_index] = 0;
+            // TODO: probably want to track or reuse the freed PTE table
+        }
+    }
+        asm volatile("dsb sy");
+        asm volatile("tlbi vmalle1is");
+        asm volatile("dsb sy");
+        asm volatile("isb");
+
+
+    return true;
+}
+ 
 
 void enable_null_pointer_protection() {
-    printf("=== Enabling Null Pointer Protection ===\n");
-
-    uint64_t* pte_table = (uint64_t*)(PMD[0] & ~0xFFF);
-    pte_table[0] = 0;
+    unmap_address(0x0);
 }
 
 /**
@@ -247,8 +301,6 @@ void patch_page_tables() {
         PMD[i] = PMD[i] & (~0xFFF);
         PMD[i] = PMD[i] | DEVICE_LOWER_ATTRIBUTES;
     }
-    // PUD[1] = PUD[1] & (~0xFFF);
-    // PUD[1] = PUD[1] | 0x401;
 
     for (int i = 0; i < 8; i++) {
         PMD_arm[i] = PMD_arm[i] & (~0xFFF);
@@ -265,6 +317,6 @@ void check_address_mapping(uint64_t addr) {
     
     bool is_faulted = par & 1;  // bit 0 = 1 means translation faulted
     
-    printf("Address 0x%016llx: %s (PAR_EL1=0x%016llx)\n", 
+    printf("Address 0x%llx: %s (PAR_EL1=0x%llx)\n", 
            addr, is_faulted ? "UNMAPPED" : "MAPPED", par);
 }

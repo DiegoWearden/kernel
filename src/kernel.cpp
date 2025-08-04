@@ -84,6 +84,7 @@ extern "C" void primary_kernel_init() {
     clean_dcache_line(&smpInitDone);
     wake_up_cores();
     enable_null_pointer_protection();
+    check_address_mapping(0x0);
     null_protection_enabled = true;
     clean_dcache_line(&null_protection_enabled);
     kernel_init();
