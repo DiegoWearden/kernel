@@ -72,7 +72,7 @@ extern "C" void secondary_kernel_init(){
 }
 
 extern "C" void primary_kernel_init() {
-    create_page_tables_cpp();
+    create_page_tables();
     patch_page_tables();
     init_mmu();
     uart_init();
@@ -104,7 +104,7 @@ void kernel_init(){
         *null_ptr = 0xDEADBEEF;
     }
     if(getCoreID() == 2){
-        uint64_t* null_ptr = (uint64_t*)0xef;
+        uint64_t* null_ptr = (uint64_t*)0xe8;
         *null_ptr = 0xDEADBEEF;
     }
     if(getCoreID() == 3){

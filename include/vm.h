@@ -78,16 +78,11 @@
 void patch_page_tables();
 extern "C" void create_page_tables();
 extern "C" void init_mmu();
-void create_page_tables_cpp();
-bool map_address(uint64_t virt_addr, uint64_t phys_addr, uint64_t size, uint64_t attrs = 0);
-bool map_range(uint64_t virt_start, uint64_t phys_start, uint64_t size, uint64_t attrs = 0, bool force_4kb = false);
-bool map_range(uint64_t virt_start, uint64_t phys_start, uint64_t size, uint64_t attrs, bool force_4kb);
-bool map_range_skip_null(uint64_t virt_start, uint64_t phys_start, uint64_t size, uint64_t attrs, bool force_4kb);
+void create_page_tables();
+bool map_address_2mb(uint64_t virt_addr, uint64_t phys_addr, uint64_t attrs);
+bool map_address_4kb(uint64_t virt_addr, uint64_t phys_addr, uint64_t attrs);
 void enable_null_pointer_protection();
-void check_address_mapping(uint64_t addr);
-void print_null_page_info();
-void demo_mapping_functions();
-void print_page_table_stats();
+void check_address_mapping(uint64_t addr); 
 bool map_4kb(uint64_t virt_addr, uint64_t phys_addr, uint64_t attrs);
 
 // Page size constants
