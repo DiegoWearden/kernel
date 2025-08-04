@@ -1,6 +1,7 @@
 #include "vm.h"
 #include "libk.h"
 #include "stdint.h"
+#include "dcache.h"
 
 uint64_t PGD[512] __attribute__((aligned(4096), section(".paging")));
 uint64_t PUD[512] __attribute__((aligned(4096), section(".paging")));
@@ -225,7 +226,7 @@ bool unmap_address(uint64_t virt_addr) {
 
     if ((pmd_entry & PTE_TABLE) == 0) {
         pmd_table[pmd_index] = 0;
-        asm volatile("dc civac, %0" :: "r"(pmd_table) : "memory");
+        clean_and_invalidate_dcache_line(pmd_table); 
     } else {
         uint64_t* pte_table = (uint64_t*)(pmd_entry & ~0xFFF);
         if (!(pte_table[pte_index] & PTE_VALID))
@@ -242,7 +243,7 @@ bool unmap_address(uint64_t virt_addr) {
                 break;
             }
         }
-        asm volatile("dc civac, %0" :: "r"(pte_table) : "memory");
+        clean_and_invalidate_dcache_line(pte_table); 
         if (empty) {
             pmd_table[pmd_index] = 0;
             // TODO: probably want to track or reuse the freed PTE table
