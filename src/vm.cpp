@@ -275,9 +275,11 @@ void create_page_tables() {
         PMD_arm[i] = 0;
     }
 
-    // Map the first 2MB of memory in 4kb pages, we will unmap the first 4kb page later to enable null pointer protection
-    // but we need to map it first to wake up the cores since we need to use the mailbox registers that are in the first 4kb page
-    // TODO: there is a better way to do this, but this works for now
+    /*
+    * Map the first 2MB of memory in 4kb pages, we will unmap the first 4kb page later to enable null pointer protection
+    * but we need to map it first to wake up the cores since we need to use the mailbox registers that are in the first 4kb page
+    * TODO: there might be a better way to do this where we can wake up the cores without every having to map the first 4kb page, but this works for now
+    */
     for (uint64_t virt_addr = 0x0; virt_addr < 0x200000; virt_addr += PAGE_SIZE_4KB) {
         map_address_4kb(virt_addr, virt_addr, get_memory_attributes(virt_addr));
     }
