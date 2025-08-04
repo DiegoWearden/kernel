@@ -269,6 +269,9 @@ void create_page_tables() {
     // Map the first 2MB of memory in 4kb pages, we will unmap the first 4kb page later to enable null pointer protection
     // but we need to map it first to wake up the cores since we need to use the mailbox registers that are in the first 4kb page
     // TODO: there might be a better way to do this where we can wake up the cores without ever having to map the first 4kb page, but this works for now
+    // possible idea: we could pre populate the spin table with the physical addresses of the secondary cores, 
+    // and then just send SEV once the primary core has the mmu enabled, but this would require a way to get the physical addresses of the secondary cores
+    // and we would need to make sure that the spin table is properly aligned and that the secondary cores are able to jump to the correct address
     for (uint64_t virt_addr = 0x0; virt_addr < 0x200000; virt_addr += PAGE_SIZE_4KB) {
         map_address_4kb(virt_addr, virt_addr, get_memory_attributes(virt_addr));
     }
