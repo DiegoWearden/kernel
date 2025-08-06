@@ -1,9 +1,10 @@
 #include "uart.h"
 #include "utils.h"
+#include "vm.h"
 #include "peripherals/base.h"
 
 // Base addresses for UART0 and GPIO
-#define MMIO_BASE       0x3F000000
+#define MMIO_BASE       (VA_START | 0x3F000000)
 #define GPFSEL1         ((volatile unsigned int*)(MMIO_BASE + 0x200004))
 #define GPPUD           ((volatile unsigned int*)(MMIO_BASE + 0x200094))
 #define GPPUDCLK0       ((volatile unsigned int*)(MMIO_BASE + 0x200098))
