@@ -8,14 +8,15 @@ int TestFramework::total_tests = 0;
 int TestFramework::passed_tests = 0;
 int TestFramework::failed_tests = 0;
 bool TestFramework::test_running = false;
+const int MAX_TESTS = 256;
 
 void TestFramework::register_test(const char* name, TestFunction function) {
     // Allocate new test entry (simple allocation for kernel)
-    static TestEntry test_entries[64]; // Support up to 64 tests
+    static TestEntry test_entries[MAX_TESTS]; // Support up to 64 tests
     static int next_entry = 0;
     
-    if (next_entry >= 64) {
-        printf("ERROR: Too many tests registered (max 64)\n");
+    if (next_entry >= MAX_TESTS) {
+        printf("ERROR: Too many tests registered (max %d)\n", MAX_TESTS);
         return;
     }
     
@@ -66,7 +67,7 @@ bool TestFramework::run_test(const char* name) {
     current_result.file_name = nullptr;
     test_running = true;
     
-    printf("Running test: %s... ", name);
+    printf("Running test: %s...\n", name);
     
     // Run the test
     current->function();
@@ -75,11 +76,11 @@ bool TestFramework::run_test(const char* name) {
     
     // Report result
     if (current_result.passed) {
-        printf("PASSED\n");
+        printf("\n  -> PASSED\n");
         passed_tests++;
         return true;
     } else {
-        printf("FAILED\n");
+        printf("  -> FAILED\n");
         if (current_result.failure_reason) {
             printf("  Reason: %s", current_result.failure_reason);
             if (current_result.file_name && current_result.line_number > 0) {

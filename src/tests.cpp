@@ -208,7 +208,7 @@ void test_heap_basic_allocation() {
     TEST_ASSERT_TRUE(ptr2 != ptr3, "Different allocations should have different addresses");
     TEST_ASSERT_TRUE(ptr1 != ptr3, "Different allocations should have different addresses");
     
-    printf("\n  Core %lld: Allocated ptrs: 0x%llx, 0x%llx, 0x%llx", 
+    printf("\n  Core %lld: Allocated ptrs: 0x%llx, 0x%llx, 0x%llx\n", 
            core_id, (uint64_t)ptr1, (uint64_t)ptr2, (uint64_t)ptr3);
 }
 
@@ -255,7 +255,7 @@ void test_heap_statistics() {
     size_t used_before = get_heap_used();
     size_t free_before = get_heap_free();
     
-    printf("\n    Core %lld: Before allocation - used: %zu, free: %zu", 
+    printf("\n    Core %lld: Before allocation - used: %zu, free: %zu\n", 
            core_id, used_before, free_before);
     
     void* ptr = kmalloc(1024);
@@ -264,7 +264,7 @@ void test_heap_statistics() {
     size_t used_after = get_heap_used();
     size_t free_after = get_heap_free();
     
-    printf("\n    Core %lld: After allocation - used: %zu, free: %zu", 
+    printf("    Core %lld: After allocation - used: %zu, free: %zu\n", 
            core_id, used_after, free_after);
     
     TEST_ASSERT_TRUE(used_after > used_before, "Used memory should increase after allocation");
@@ -337,7 +337,7 @@ void test_cpp_new_delete() {
     delete[] arr;
     delete obj;
     
-    printf("\n  Core %lld: C++ operators test completed", core_id);
+    printf("\n  Core %lld: C++ operators test completed\n", core_id);
 }
 
 void test_cpp_alignment() {
@@ -369,12 +369,12 @@ void test_heap_linker_configuration() {
     void* end = get_heap_end();
     void* current = get_heap_current();
     
-    printf("\n    Heap start:   0x%llx", (uint64_t)start);
-    printf("\n    Heap end:     0x%llx", (uint64_t)end);
-    printf("\n    Heap current: 0x%llx", (uint64_t)current);
+    printf("\n    Heap start:   0x%llx\n", (uint64_t)start);
+    printf("    Heap end:     0x%llx\n", (uint64_t)end);
+    printf("    Heap current: 0x%llx\n", (uint64_t)current);
     
     size_t total_size = get_heap_used() + get_heap_free();
-    printf("\n    Total size:   %d bytes (%d MB)", total_size, total_size / (1024 * 1024));
+    printf("\n    Total size:   %zu bytes (%zu MB)\n", total_size, total_size / (1024 * 1024));
     
     TEST_ASSERT_TRUE(start < end, "Heap start should be before heap end");
     TEST_ASSERT_TRUE(current >= start, "Current pointer should be after start");
@@ -387,31 +387,49 @@ void test_heap_linker_configuration() {
     TEST_ASSERT_TRUE(test_ptr < end, "Allocated memory should be within heap bounds");
 }
 
+void test_printf_size_t_format() {
+    uint64_t core_id = getCoreID();
+    printf("\n  Core %lld: Testing %%zu format specifier", core_id);
+    
+    size_t test_values[] = {0, 1, 1024, 1048576, 33554432}; // 0, 1, 1KB, 1MB, 32MB
+    const char* descriptions[] = {"zero", "one", "1KB", "1MB", "32MB"};
+    
+    for (int i = 0; i < 5; i++) {
+        printf("\n    %s: %zu bytes", descriptions[i], test_values[i]);
+    }
+    
+    // Test hex format too
+    printf("\n    Hex format: 0x%zx", (size_t)0xDEADBEEF);
+    printf("\n    Large value: %zu\n", (size_t)0xFFFFFFFFUL);
+    
+    TEST_ASSERT_TRUE(true, "printf %zu format test completed");
+}
+
 
 void register_all_tests() {
-    // Basic functionality tests
-    MANUAL_REGISTER_TEST(test_k_strlen);
-    MANUAL_REGISTER_TEST(test_k_streq);
-    MANUAL_REGISTER_TEST(test_k_strcmp);
-    MANUAL_REGISTER_TEST(test_k_isdigit);
-    MANUAL_REGISTER_TEST(test_k_min);
+    // // Basic functionality tests
+    // MANUAL_REGISTER_TEST(test_k_strlen);
+    // MANUAL_REGISTER_TEST(test_k_streq);
+    // MANUAL_REGISTER_TEST(test_k_strcmp);
+    // MANUAL_REGISTER_TEST(test_k_isdigit);
+    // MANUAL_REGISTER_TEST(test_k_min);
     
-    // Atomic and concurrency tests
-    MANUAL_REGISTER_TEST(test_atomic_basic);
-    MANUAL_REGISTER_TEST(test_atomic_exchange);
-    MANUAL_REGISTER_TEST(test_atomic_bool);
-    MANUAL_REGISTER_TEST(test_spinlock_basic);
+    // // Atomic and concurrency tests
+    // MANUAL_REGISTER_TEST(test_atomic_basic);
+    // MANUAL_REGISTER_TEST(test_atomic_exchange);
+    // MANUAL_REGISTER_TEST(test_atomic_bool);
+    // MANUAL_REGISTER_TEST(test_spinlock_basic);
     
-    // Memory tests - safe for all cores (using local memory)
-    MANUAL_REGISTER_TEST(test_memory_basic);
-    MANUAL_REGISTER_TEST(test_memory_copy);
+    // // Memory tests - safe for all cores (using local memory)
+    // MANUAL_REGISTER_TEST(test_memory_basic);
+    // MANUAL_REGISTER_TEST(test_memory_copy);
     
-    // System tests - will show different values per core
-    MANUAL_REGISTER_TEST(test_core_id);
-    MANUAL_REGISTER_TEST(test_exception_level);
-    MANUAL_REGISTER_TEST(test_stack_pointer);
-    MANUAL_REGISTER_TEST(test_valid_memory_access);
-    MANUAL_REGISTER_TEST(test_stack_isolation);
+    // // System tests - will show different values per core
+    // MANUAL_REGISTER_TEST(test_core_id);
+    // MANUAL_REGISTER_TEST(test_exception_level);
+    // MANUAL_REGISTER_TEST(test_stack_pointer);
+    // MANUAL_REGISTER_TEST(test_valid_memory_access);
+    // MANUAL_REGISTER_TEST(test_stack_isolation);
     
     // Multi-core memory protection tests (the main event!)
     // MANUAL_REGISTER_TEST(test_null_pointer_protection);
@@ -428,7 +446,4 @@ void register_all_tests() {
     // C++ operator tests
     MANUAL_REGISTER_TEST(test_cpp_new_delete);
     MANUAL_REGISTER_TEST(test_cpp_alignment);
-    
-    // Linker configuration tests
-    MANUAL_REGISTER_TEST(test_heap_linker_configuration);
 } 

@@ -34,7 +34,7 @@ void* kmalloc(size_t size) {
         char* new_current = current + aligned_size;
         
         if (new_current > heap_end) {
-            printf("kmalloc: Out of heap memory! Requested %d bytes\n", (int)size);
+            printf("kmalloc: Out of heap memory! Requested %zu bytes\n", size);
             return nullptr;
         }
         
