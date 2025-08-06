@@ -3,7 +3,6 @@
 #include "atomic.h"
 #include "utils.h"
 
-// Basic library tests
 void test_k_strlen() {
     TEST_ASSERT_EQUAL(5, K::strlen("hello"), "strlen should return correct length");
     TEST_ASSERT_EQUAL(0, K::strlen(""), "strlen of empty string should be 0");
@@ -37,7 +36,7 @@ void test_k_min() {
     TEST_ASSERT_EQUAL(-5, K::min(-5, -1, 0), "min of -5,-1,0 should be -5");
 }
 
-// Test atomic operations
+
 void test_atomic_basic() {
     Atomic<int> atomic_int(42);
     TEST_ASSERT_EQUAL(42, atomic_int.get(), "atomic should return initial value");
@@ -62,7 +61,6 @@ void test_atomic_bool() {
     TEST_ASSERT_TRUE(atomic_bool.get(), "atomic bool should be true after set");
 }
 
-// Test SpinLock (this is interesting on multiple cores)
 void test_spinlock_basic() {
     SpinLock lock;
     
@@ -72,7 +70,6 @@ void test_spinlock_basic() {
     lock.unlock();
 }
 
-// Memory tests
 void test_memory_basic() {
     char buffer[64];
     K::memset(buffer, 0xAA, 64);
@@ -96,7 +93,6 @@ void test_memory_copy() {
     TEST_ASSERT_STRING_EQUAL("Hello, World!", dest, "memcpy should copy string correctly");
 }
 
-// Core system tests - these will show different values per core
 void test_core_id() {
     uint64_t core_id = getCoreID();
     TEST_ASSERT_TRUE(core_id < 4, "Core ID should be less than 4");
@@ -115,48 +111,35 @@ void test_stack_pointer() {
     TEST_ASSERT_NOT_NULL((void*)sp, "Stack pointer should not be null");
 }
 
-// Test that we can write to valid memory addresses
 void test_valid_memory_access() {
     printf("\n  Testing valid memory access on core %lld", getCoreID());
     
-    // Use stack memory which should be valid
     uint64_t valid_memory = 0;
     uint64_t test_value = 0xDEADBEEF;
     
-    // This should work without any protection issues
     valid_memory = test_value;
     
     TEST_ASSERT_EQUAL(test_value, valid_memory, "Should be able to write to valid memory");
 }
 
-// ============================================================================
-// MULTI-CORE NULL POINTER PROTECTION TESTS
-// ============================================================================
-
-// Test null pointer protection - all cores will run this same test
 void test_null_pointer_protection() {
     uint64_t core_id = getCoreID();
     printf("\n  Core %lld: Testing null pointer protection at 0x0", core_id);
     
-    // All cores test the same address: 0x0 (true null pointer)
     uint64_t address = 0x0;
     uint64_t test_value = 0xDEADBEEF;
     
     printf("\n  Core %lld: Attempting to write 0x%llx to address 0x%llx", core_id, test_value, address);
     
-    // This should trigger null pointer protection on ALL cores
     volatile uint64_t* ptr = (volatile uint64_t*)address;
     *ptr = test_value;
     
-    // If we reach here, protection is not working
     TEST_FAIL("Write to null pointer succeeded - protection may not be enabled");
 }
 
-// Test protection of low memory addresses - all cores test different addresses
 void test_low_memory_protection() {
     uint64_t core_id = getCoreID();
     
-    // Each core tests a different low memory address, but all use the same test logic
     uint64_t test_addresses[] = {0x0, 0xf0, 0xe8, 0xe0, 0x8, 0x10, 0x18, 0x20};
     uint64_t address = test_addresses[core_id % (sizeof(test_addresses) / sizeof(test_addresses[0]))];
     
@@ -172,19 +155,16 @@ void test_low_memory_protection() {
     TEST_FAIL("Write to protected low memory succeeded - protection may not be enabled");
 }
 
-// Test memory protection boundaries - comprehensive test
 void test_memory_protection_boundaries() {
     uint64_t core_id = getCoreID();
     printf("\n  Core %lld: Testing memory protection boundaries", core_id);
     
-    // Test various low addresses that should be protected
     uint64_t protected_addresses[] = {0x0, 0x8, 0x10, 0x18, 0x20, 0xe0, 0xe8, 0xf0, 0xf8};
     int num_addresses = sizeof(protected_addresses) / sizeof(protected_addresses[0]);
     
     printf("\n  Core %lld: Testing %d potentially protected addresses:", core_id, num_addresses);
     
-    // Each core can test all addresses, or we can distribute them
-    int start_idx = core_id * 2; // Each core tests 2 addresses
+    int start_idx = core_id * 2;
     int end_idx = start_idx + 2;
     if (end_idx > num_addresses) end_idx = num_addresses;
     
@@ -193,30 +173,23 @@ void test_memory_protection_boundaries() {
         printf("(would attempt write here)");
     }
     
-    // For now, this test just documents what addresses we're checking
     TEST_ASSERT_TRUE(true, "Memory protection boundary test completed");
 }
 
-// Multi-core specific test: Test that cores can't interfere with each other's stacks
 void test_stack_isolation() {
     uint64_t core_id = getCoreID();
     uint64_t my_stack = get_sp();
     
     printf("\n  Core %lld: Stack isolation test, my stack at 0x%llx", core_id, my_stack);
     
-    // Write a unique pattern to our stack
     volatile uint64_t stack_marker = 0xC0DE0000 + core_id;
     uint64_t test_value = stack_marker;
     
-    // Verify we can write to our own stack
     TEST_ASSERT_EQUAL(test_value, stack_marker, "Should be able to write to own stack");
     
     printf("\n  Core %lld: Successfully wrote unique marker 0x%llx", core_id, stack_marker);
 }
 
-// ============================================================================
-// TEST REGISTRATION
-// ============================================================================
 
 void register_all_tests() {
     // Basic functionality tests - safe for all cores
