@@ -8,6 +8,7 @@
 #include "vm.h"
 #include "atomic.h"
 #include "dcache.h"
+#include "test.h"
 
 struct Stack {
     static constexpr int BYTES = 4096;
@@ -19,16 +20,16 @@ PerCPU<Stack> stacks;
 static bool smpInitDone = false;
 static bool null_protection_enabled = false;
 
-
 void kernel_init();
+
+// Declare the test registration function
+extern void register_all_tests();
 
 SpinLock lock;
 
 extern "C" uint64_t pickKernelStack(void) {
     return (uint64_t) &stacks.forCPU(smpInitDone ? getCoreID() : 0).bytes[Stack::BYTES];
 }
-
-
 
 extern "C" void secondary_kernel_init(){
     while(!null_protection_enabled);
@@ -44,7 +45,7 @@ extern "C" void primary_kernel_init() {
     init_printf(nullptr, uart_putc_wrapper);
     printf("printf initialized!!!\n");
     
-        // Initialize heap
+    // Initialize heap
     smpInitDone = true;
     clean_dcache_line(&smpInitDone);
     wake_up_cores();
@@ -55,27 +56,32 @@ extern "C" void primary_kernel_init() {
 }
 
 void kernel_init(){
+    uint64_t core_id = getCoreID();
+    
     lock.lock();
-    printf("Hi, I'm core %d\n", getCoreID());
-    printf("in EL: %d\n", get_el());
+    printf("Hi, I'm core %lld\n", core_id);
+    printf("in EL: %lld\n", get_el());
     printf("Stack Pointer: %llx\n", get_sp());
     lock.unlock();
-    if(getCoreID() == 0){
-        uint64_t* null_ptr = (uint64_t*)0x0;
-        *null_ptr = 0xDEADBEEF;
-    }
-    if(getCoreID() == 1){
-        uint64_t* null_ptr = (uint64_t*)0xf0;
-        *null_ptr = 0xDEADBEEF;
-    }
-    if(getCoreID() == 2){
-        uint64_t* null_ptr = (uint64_t*)0xe8;
-        *null_ptr = 0xDEADBEEF;
-    }
-    if(getCoreID() == 3){
-        uint64_t* null_ptr = (uint64_t*)0xe0;
-        *null_ptr = 0xDEADBEEF;
-    }
+    
+    // All cores register and run the same tests!
+    lock.lock();
+    printf("\n=== CORE %lld: STARTING MULTI-CORE KERNEL TESTS ===\n", core_id);
+    printf("Each core will run the same comprehensive test suite...\n");
+    printf("Note: Memory protection tests may cause expected page faults\n\n");
+    
+    // Register tests (only needs to be done once, but it's safe to do multiple times)
+    register_all_tests();
+    // Each core runs the full test suite
+    printf("=== CORE %lld: RUNNING TESTS ===\n", core_id);
+    
+    TestFramework::run_all_tests();
+
+    printf("\n=== CORE %lld: ALL TESTS COMPLETED ===\n", core_id);
+    printf("Core %lld entering idle state.\n\n", core_id);
+    lock.unlock();
+    
+    // All cores enter idle state after testing
     while(true) {
         asm volatile("wfe");
     }
