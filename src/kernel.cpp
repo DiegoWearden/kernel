@@ -9,6 +9,7 @@
 #include "atomic.h"
 #include "dcache.h"
 #include "test.h"
+#include "heap.h"
 
 struct Stack {
     static constexpr int BYTES = 4096;
@@ -22,7 +23,6 @@ static bool null_protection_enabled = false;
 
 void kernel_init();
 
-// Declare the test registration function
 extern void register_all_tests();
 
 SpinLock lock;
@@ -45,7 +45,9 @@ extern "C" void primary_kernel_init() {
     init_printf(nullptr, uart_putc_wrapper);
     printf("printf initialized!!!\n");
     
-    // Initialize heap
+    heap_init();
+    printf("Heap allocator initialized!\n");
+    
     smpInitDone = true;
     clean_dcache_line(&smpInitDone);
     wake_up_cores();
@@ -64,15 +66,12 @@ void kernel_init(){
     printf("Stack Pointer: %llx\n", get_sp());
     lock.unlock();
     
-    // All cores register and run the same tests!
     lock.lock();
     printf("\n=== CORE %lld: STARTING MULTI-CORE KERNEL TESTS ===\n", core_id);
     printf("Each core will run the same comprehensive test suite...\n");
     printf("Note: Memory protection tests may cause expected page faults\n\n");
     
-    // Register tests (only needs to be done once, but it's safe to do multiple times)
     register_all_tests();
-    // Each core runs the full test suite
     printf("=== CORE %lld: RUNNING TESTS ===\n", core_id);
     
     TestFramework::run_all_tests();
@@ -81,7 +80,6 @@ void kernel_init(){
     printf("Core %lld entering idle state.\n\n", core_id);
     lock.unlock();
     
-    // All cores enter idle state after testing
     while(true) {
         asm volatile("wfe");
     }

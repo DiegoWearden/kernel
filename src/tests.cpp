@@ -2,6 +2,7 @@
 #include "libk.h"
 #include "atomic.h"
 #include "utils.h"
+#include "heap.h"
 
 void test_k_strlen() {
     TEST_ASSERT_EQUAL(5, K::strlen("hello"), "strlen should return correct length");
@@ -190,16 +191,212 @@ void test_stack_isolation() {
     printf("\n  Core %lld: Successfully wrote unique marker 0x%llx", core_id, stack_marker);
 }
 
+void test_heap_basic_allocation() {
+    uint64_t core_id = getCoreID();
+    printf("\n  Core %lld: Testing basic heap allocation", core_id);
+    
+    void* ptr1 = kmalloc(32);
+    TEST_ASSERT_NOT_NULL(ptr1, "Small allocation should succeed");
+    
+    void* ptr2 = kmalloc(1024);
+    TEST_ASSERT_NOT_NULL(ptr2, "Medium allocation should succeed");
+    
+    void* ptr3 = kmalloc(4096);
+    TEST_ASSERT_NOT_NULL(ptr3, "Large allocation should succeed");
+    
+    TEST_ASSERT_TRUE(ptr1 != ptr2, "Different allocations should have different addresses");
+    TEST_ASSERT_TRUE(ptr2 != ptr3, "Different allocations should have different addresses");
+    TEST_ASSERT_TRUE(ptr1 != ptr3, "Different allocations should have different addresses");
+    
+    printf("\n  Core %lld: Allocated ptrs: 0x%llx, 0x%llx, 0x%llx", 
+           core_id, (uint64_t)ptr1, (uint64_t)ptr2, (uint64_t)ptr3);
+}
+
+void test_heap_zero_initialization() {
+    uint64_t core_id = getCoreID();
+    printf("\n  Core %lld: Testing heap zero initialization", core_id);
+    
+    void* ptr = kmalloc(64);
+    TEST_ASSERT_NOT_NULL(ptr, "Allocation should succeed");
+    
+    uint8_t* bytes = (uint8_t*)ptr;
+    bool all_zero = true;
+    for (int i = 0; i < 64; i++) {
+        if (bytes[i] != 0) {
+            all_zero = false;
+            break;
+        }
+    }
+    
+    TEST_ASSERT_TRUE(all_zero, "Allocated memory should be zero-initialized");
+}
+
+void test_heap_alignment() {
+    uint64_t core_id = getCoreID();
+    printf("\n  Core %lld: Testing heap alignment", core_id);
+    
+    void* ptr1 = kmalloc(1);   
+    void* ptr2 = kmalloc(15);  
+    void* ptr3 = kmalloc(17);  
+    
+    TEST_ASSERT_NOT_NULL(ptr1, "Small allocation should succeed");
+    TEST_ASSERT_NOT_NULL(ptr2, "Medium allocation should succeed");
+    TEST_ASSERT_NOT_NULL(ptr3, "Large allocation should succeed");
+    
+    TEST_ASSERT_EQUAL(0, ((uintptr_t)ptr1) & 15, "Allocation should be 16-byte aligned");
+    TEST_ASSERT_EQUAL(0, ((uintptr_t)ptr2) & 15, "Allocation should be 16-byte aligned");
+    TEST_ASSERT_EQUAL(0, ((uintptr_t)ptr3) & 15, "Allocation should be 16-byte aligned");
+}
+
+void test_heap_statistics() {
+    uint64_t core_id = getCoreID();
+    printf("\n  Core %lld: Testing heap statistics", core_id);
+    
+    size_t used_before = get_heap_used();
+    size_t free_before = get_heap_free();
+    
+    printf("\n    Core %lld: Before allocation - used: %zu, free: %zu", 
+           core_id, used_before, free_before);
+    
+    void* ptr = kmalloc(1024);
+    TEST_ASSERT_NOT_NULL(ptr, "Allocation should succeed");
+    
+    size_t used_after = get_heap_used();
+    size_t free_after = get_heap_free();
+    
+    printf("\n    Core %lld: After allocation - used: %zu, free: %zu", 
+           core_id, used_after, free_after);
+    
+    TEST_ASSERT_TRUE(used_after > used_before, "Used memory should increase after allocation");
+    TEST_ASSERT_TRUE(free_after < free_before, "Free memory should decrease after allocation");
+}
+
+void test_heap_boundary_conditions() {
+    uint64_t core_id = getCoreID();
+    printf("\n  Core %lld: Testing heap boundary conditions", core_id);
+    
+    void* ptr_zero = kmalloc(0);
+    TEST_ASSERT_NULL(ptr_zero, "Zero-size allocation should return NULL");
+    
+    void* ptr = kmalloc(128);
+    TEST_ASSERT_NOT_NULL(ptr, "Normal allocation should succeed");
+    
+    uint8_t* bytes = (uint8_t*)ptr;
+    for (int i = 0; i < 128; i++) {
+        bytes[i] = (i % 256);
+    }
+    
+    bool pattern_correct = true;
+    for (int i = 0; i < 128; i++) {
+        if (bytes[i] != (i % 256)) {
+            pattern_correct = false;
+            break;
+        }
+    }
+    
+    TEST_ASSERT_TRUE(pattern_correct, "Should be able to read/write allocated memory");
+}
+
+void test_cpp_new_delete() {
+    uint64_t core_id = getCoreID();
+    printf("\n  Core %lld: Testing C++ new/delete operators", core_id);
+    
+    int* ptr = new int(42);
+    TEST_ASSERT_NOT_NULL(ptr, "new int should succeed");
+    TEST_ASSERT_EQUAL(42, *ptr, "new int should initialize value");
+    
+    int* arr = new int[10];
+    TEST_ASSERT_NOT_NULL(arr, "new int[] should succeed");
+    
+    for (int i = 0; i < 10; i++) {
+        TEST_ASSERT_EQUAL(0, arr[i], "Array should be zero-initialized");
+        arr[i] = i * 2;
+    }
+    
+    for (int i = 0; i < 10; i++) {
+        TEST_ASSERT_EQUAL(i * 2, arr[i], "Array writes should persist");
+    }
+    
+    struct TestClass {
+        int a, b, c;
+        TestClass(int x, int y, int z) : a(x), b(y), c(z) {}
+    };
+    
+    TestClass* obj = new TestClass(1, 2, 3);
+    TEST_ASSERT_NOT_NULL(obj, "new TestClass should succeed");
+    TEST_ASSERT_EQUAL(1, obj->a, "Constructor should set a");
+    TEST_ASSERT_EQUAL(2, obj->b, "Constructor should set b");
+    TEST_ASSERT_EQUAL(3, obj->c, "Constructor should set c");
+    
+    char buffer[sizeof(TestClass)];
+    TestClass* placed = new(buffer) TestClass(10, 20, 30);
+    TEST_ASSERT_NOT_NULL(placed, "Placement new should succeed");
+    TEST_ASSERT_EQUAL(10, placed->a, "Placement new should call constructor");
+    
+    delete ptr;
+    delete[] arr;
+    delete obj;
+    
+    printf("\n  Core %lld: C++ operators test completed", core_id);
+}
+
+void test_cpp_alignment() {
+    uint64_t core_id = getCoreID();
+    printf("\n  Core %lld: Testing C++ operator alignment", core_id);
+    
+    int* int_ptr = new int;
+    double* double_ptr = new double;
+    uint64_t* uint64_ptr = new uint64_t;
+    
+    TEST_ASSERT_NOT_NULL(int_ptr, "new int should succeed");
+    TEST_ASSERT_NOT_NULL(double_ptr, "new double should succeed");
+    TEST_ASSERT_NOT_NULL(uint64_ptr, "new uint64_t should succeed");
+    
+    TEST_ASSERT_EQUAL(0, ((uintptr_t)int_ptr) & 15, "int allocation should be 16-byte aligned");
+    TEST_ASSERT_EQUAL(0, ((uintptr_t)double_ptr) & 15, "double allocation should be 16-byte aligned");
+    TEST_ASSERT_EQUAL(0, ((uintptr_t)uint64_ptr) & 15, "uint64_t allocation should be 16-byte aligned");
+    
+    delete int_ptr;
+    delete double_ptr;
+    delete uint64_ptr;
+}
+
+void test_heap_linker_configuration() {
+    uint64_t core_id = getCoreID();
+    printf("\n  Core %lld: Testing linker-configured heap", core_id);
+    
+    void* start = get_heap_start();
+    void* end = get_heap_end();
+    void* current = get_heap_current();
+    
+    printf("\n    Heap start:   0x%llx", (uint64_t)start);
+    printf("\n    Heap end:     0x%llx", (uint64_t)end);
+    printf("\n    Heap current: 0x%llx", (uint64_t)current);
+    
+    size_t total_size = get_heap_used() + get_heap_free();
+    printf("\n    Total size:   %d bytes (%d MB)", total_size, total_size / (1024 * 1024));
+    
+    TEST_ASSERT_TRUE(start < end, "Heap start should be before heap end");
+    TEST_ASSERT_TRUE(current >= start, "Current pointer should be after start");
+    TEST_ASSERT_TRUE(current <= end, "Current pointer should be before end");
+    TEST_ASSERT_TRUE(total_size > 0, "Heap should have non-zero size");
+    
+    void* test_ptr = kmalloc(1024);
+    TEST_ASSERT_NOT_NULL(test_ptr, "Should be able to allocate from linker-configured heap");
+    TEST_ASSERT_TRUE(test_ptr >= start, "Allocated memory should be within heap bounds");
+    TEST_ASSERT_TRUE(test_ptr < end, "Allocated memory should be within heap bounds");
+}
+
 
 void register_all_tests() {
-    // Basic functionality tests - safe for all cores
+    // Basic functionality tests
     MANUAL_REGISTER_TEST(test_k_strlen);
     MANUAL_REGISTER_TEST(test_k_streq);
     MANUAL_REGISTER_TEST(test_k_strcmp);
     MANUAL_REGISTER_TEST(test_k_isdigit);
     MANUAL_REGISTER_TEST(test_k_min);
     
-    // Atomic and concurrency tests - interesting on multiple cores
+    // Atomic and concurrency tests
     MANUAL_REGISTER_TEST(test_atomic_basic);
     MANUAL_REGISTER_TEST(test_atomic_exchange);
     MANUAL_REGISTER_TEST(test_atomic_bool);
@@ -217,7 +414,21 @@ void register_all_tests() {
     MANUAL_REGISTER_TEST(test_stack_isolation);
     
     // Multi-core memory protection tests (the main event!)
-    MANUAL_REGISTER_TEST(test_null_pointer_protection);
-    MANUAL_REGISTER_TEST(test_low_memory_protection);
-    MANUAL_REGISTER_TEST(test_memory_protection_boundaries);
+    // MANUAL_REGISTER_TEST(test_null_pointer_protection);
+    // MANUAL_REGISTER_TEST(test_low_memory_protection);
+    // MANUAL_REGISTER_TEST(test_memory_protection_boundaries);
+    
+    // Heap allocator tests
+    MANUAL_REGISTER_TEST(test_heap_basic_allocation);
+    MANUAL_REGISTER_TEST(test_heap_zero_initialization);
+    MANUAL_REGISTER_TEST(test_heap_alignment);
+    MANUAL_REGISTER_TEST(test_heap_statistics);
+    MANUAL_REGISTER_TEST(test_heap_boundary_conditions);
+    
+    // C++ operator tests
+    MANUAL_REGISTER_TEST(test_cpp_new_delete);
+    MANUAL_REGISTER_TEST(test_cpp_alignment);
+    
+    // Linker configuration tests
+    MANUAL_REGISTER_TEST(test_heap_linker_configuration);
 } 

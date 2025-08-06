@@ -28,7 +28,17 @@ SECTIONS
 
     _end = .;
 
+    /* Heap section - configurable size */
+    .heap (NOLOAD) : ALIGN(16) {
+        __heap_start = .;
+        . += HEAP_SIZE;
+        __heap_end = .;
+    }
+
     /DISCARD/ : { *(.comment) *(.gnu*) *(.note*) *(.eh_frame*) }
 }
 
 __bss_size = (__bss_end - __bss_start) >> 3;
+
+/* Define heap size - can be overridden at link time */
+HEAP_SIZE = DEFINED(HEAP_SIZE) ? HEAP_SIZE : 32M;
