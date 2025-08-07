@@ -80,6 +80,7 @@ void kernel_init(){
     printf("Core %lld entering idle state.\n\n", core_id);
     lock.unlock();
     
+    
     while(true) {
         asm volatile("wfe");
     }
