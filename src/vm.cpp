@@ -205,26 +205,29 @@ bool unmap_address(uint64_t virt_addr) {
     uint64_t pte_index = (virt_addr >> 12) & 0x1FF;
 
     // Level 0
-    if (!(PGD[pgd_index] & PTE_VALID))
+    if (!(PGD[pgd_index] & PTE_VALID)){
         return false; // nothing mapped
+    }
 
     uint64_t* pud_table = (uint64_t*)(PGD[pgd_index] & ~0xFFF);
-    if (!(pud_table[pud_index] & PTE_VALID))
+    if (!(pud_table[pud_index] & PTE_VALID)){
         return false;
-
+    }
     // Level 1
     uint64_t* pmd_table = (uint64_t*)(pud_table[pud_index] & ~0xFFF);
     uint64_t pmd_entry = pmd_table[pmd_index];
-    if (!(pmd_entry & PTE_VALID))
+    if (!(pmd_entry & PTE_VALID)){
         return false;
+    }
 
     if ((pmd_entry & PTE_TABLE) == 0) {
         pmd_table[pmd_index] = 0;
         clean_and_invalidate_dcache_line(pmd_table); 
     } else {
         uint64_t* pte_table = (uint64_t*)(pmd_entry & ~0xFFF);
-        if (!(pte_table[pte_index] & PTE_VALID))
+        if (!(pte_table[pte_index] & PTE_VALID)){
             return false;
+        }
 
         pte_table[pte_index] = 0;
 
