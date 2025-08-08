@@ -289,6 +289,6 @@ public:
 
 */
 
-
+bool atomic_wait_and_swap(volatile uint32_t* addr, uint32_t expected, uint32_t desired);
 
 #endif

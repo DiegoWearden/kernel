@@ -11,6 +11,8 @@ static char* heap_start = nullptr;
 static char* heap_end = nullptr;
 static Atomic<char*> heap_current(nullptr);
 
+#define HEAP_SIZE __heap_end - __heap_start
+
 void heap_init() {
     heap_start = __heap_start;
     heap_end = __heap_end;

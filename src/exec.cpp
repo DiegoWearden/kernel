@@ -3,6 +3,7 @@
 #include "stdint.h"
 #include "atomic.h"
 #include "utils.h"
+#include "sched.h"
 
 SpinLock exc_lock;
 
@@ -107,8 +108,13 @@ extern "C" void syscall_handler(unsigned long sp)
     printf("Syscall received on Core %d. SP: 0x%lx\n", getCoreID(), sp);
 }
 
+extern "C" void timer_irq_handler();
+
+static volatile int irq_print_budget = 4;
+
 extern "C" void handle_irq(unsigned long sp)
 {
-    // For now, just print a message.
-    printf("IRQ received on Core %d. SP: 0x%lx\n", getCoreID(), sp);
+    // Timer interrupt handler will ack; then drive scheduler tick
+    timer_irq_handler();
+    sched_tick(sp);
 }

@@ -13,6 +13,22 @@
 #define PAGING_PAGES (PAGING_MEMORY / PAGE_SIZE)
 #ifndef __ASSEMBLER__
 
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void memzero(unsigned long src, unsigned long n);
+
+// Minimal physical page allocator API
+void palloc_init();
+uint64_t palloc_page();
+void pfree_page(uint64_t phys_addr);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
 #endif /*_MM_H */

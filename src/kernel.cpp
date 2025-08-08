@@ -10,6 +10,8 @@
 #include "dcache.h"
 #include "test.h"
 #include "heap.h"
+#include "timer.h"
+#include "sched.h"
 
 struct Stack {
     static constexpr int BYTES = 4096;
@@ -47,6 +49,9 @@ extern "C" void primary_kernel_init() {
     
     heap_init();
     printf("Heap allocator initialized!\n");
+
+    sched_init();
+
     
     smpInitDone = true;
     clean_dcache_line(&smpInitDone);
@@ -54,35 +59,42 @@ extern "C" void primary_kernel_init() {
     enable_null_pointer_protection();
     null_protection_enabled = true;
     clean_dcache_line(&null_protection_enabled);
+
+    // Start core 0 as well
     kernel_init();
 }
 
 void kernel_init(){
-    uint64_t core_id = getCoreID();
-    
-    lock.lock();
-    printf("Hi, I'm core %lld\n", core_id);
-    printf("in EL: %lld\n", get_el());
-    printf("Stack Pointer: %llx\n", get_sp());
-    lock.unlock();
-    
-    lock.lock();
-    printf("\n=== CORE %lld: STARTING MULTI-CORE KERNEL TESTS ===\n", core_id);
-    printf("Each core will run the same comprehensive test suite...\n");
-    printf("Note: Memory protection tests may cause expected page faults\n\n");
-    
-    register_all_tests();
-    printf("=== CORE %lld: RUNNING TESTS ===\n", core_id);
-    
-    TestFramework::run_all_tests();
 
-    printf("\n=== CORE %lld: ALL TESTS COMPLETED ===\n", core_id);
-    printf("Core %lld entering idle state.\n\n", core_id);
-    lock.unlock();
-    
-    
-    while(true) {
-        asm volatile("wfe");
+    // demo threads
+    auto worker = [](void* a){
+        (void)a;
+        uint64_t last = 0;
+        while (1) {
+            uint64_t t = timer_ticks();
+            if (t - last >= 100) { // ~1s if 10ms tick
+                printf("heartbeat core=%lld t=%llu\n", getCoreID(), t);
+                last = t;
+            }
+            sched_yield(); // be polite
+        }
+    };
+    if(getCoreID() == 0) {
+    thread_create(worker, (void*)(uint64_t)0, 0);
     }
+    if(getCoreID() == 1) {
+        thread_create(worker, (void*)(uint64_t)1, 1);
+    }
+    if(getCoreID() == 2) {
+        thread_create(worker, (void*)(uint64_t)2, 2);
+    }
+    if(getCoreID() == 3) {
+        thread_create(worker, (void*)(uint64_t)3, 3);
+    }
+    asm volatile("msr daifclr, #2");
+    timer_init_qA7(10000);
+    sched_start_cpu();
+    // unused now for tests
+    while(true) asm volatile("wfe");
 }
 
