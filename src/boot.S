@@ -203,10 +203,15 @@ secondary_kernel_main:
 .global wake_up_cores
 wake_up_cores:
     
-    mov x0, #0
-    adr x0, secondary 
+    // Compute the physical entry address for secondary cores.
+    // If the current PC is in the higher-half mapping (>= VA_START),
+    // convert to physical by subtracting VA_START. Otherwise, use it directly.
+    adr x0, secondary
     ldr x4, =(VA_START)
+    cmp x0, x4
+    b.lo 1f
     sub x0, x0, x4
+1:
 
     dsb sy
     isb
@@ -218,8 +223,7 @@ wake_up_cores:
     mov x1, #0xf0
     str x0, [x1]
 
-    // we wrote to addresses 0xe0, 0xe8, and 0xf0, we must now write them back to memory since 
-    // primary core has data cache on at this point
+    // Ensure spin-table writes reach memory if mmu and data cache is enabled
     movz x0, #0xe0
     dc cvac, x0
     movz x0, #0xe8
