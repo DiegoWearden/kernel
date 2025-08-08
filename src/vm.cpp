@@ -85,6 +85,11 @@ static inline uint64_t get_memory_attributes(uint64_t phys_addr) {
     return PTE_SHARED | PTE_AP_RW | PTE_ATTRINDX_NORMAL;
 }
 
+// Export a helper for normal cached page attributes for heap expansion
+uint64_t vm_get_normal_page_attrs() {
+    return PTE_SHARED | PTE_AP_RW | PTE_ATTRINDX_NORMAL;
+}
+
 // Map a 2MB block
 bool map_address_2mb(uint64_t virt_addr, uint64_t phys_addr, uint64_t attrs) {
     const uint64_t BLOCK_SIZE = 2 * 1024 * 1024;

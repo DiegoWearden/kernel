@@ -28,6 +28,8 @@ MAP_FILE   = $(BUILD_DIR)/kernel.map
 
 # Compiler and linker flags
 CFLAGS = -Wall -Wextra -nostdlib -ffreestanding -I$(INCLUDE_DIR) -g -mcpu=cortex-a53 -march=armv8-a+crc -latomic -mstrict-align -mno-outline-atomics
+# C++ specific flags: no exceptions, no RTTI, no unwind
+CPPFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-threadsafe-statics -fno-use-cxa-atexit
 LDFLAGS = -T linker.ld
 
 # Default target
@@ -48,7 +50,7 @@ $(BUILD_DIR)/%_c.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 
 # Compile C++ files
 $(BUILD_DIR)/%_cpp.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
-	$(CXX) $(CFLAGS) -c $< -o $@
+	$(CXX) $(CPPFLAGS) -c $< -o $@
 
 # Link all object files into ELF and generate map
 $(KERNEL_ELF): $(ASM_OBJ) $(C_OBJ) $(CPP_OBJ) | $(BUILD_DIR)

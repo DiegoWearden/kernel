@@ -85,4 +85,3 @@ void kernel_init(){
         asm volatile("wfe");
     }
 }
-

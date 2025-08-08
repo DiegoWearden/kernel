@@ -297,6 +297,45 @@ void test_heap_boundary_conditions() {
     TEST_ASSERT_TRUE(pattern_correct, "Should be able to read/write allocated memory");
 }
 
+// New tests for free-list allocator
+void test_heap_free_reduces_used() {
+    size_t used_before = get_heap_used();
+    void* p = kmalloc(1234);
+    TEST_ASSERT_NOT_NULL(p, "Allocation should succeed");
+    size_t used_after_alloc = get_heap_used();
+    TEST_ASSERT_TRUE(used_after_alloc > used_before, "Used should increase after alloc");
+    kfree(p);
+    size_t used_after_free = get_heap_used();
+    TEST_ASSERT_TRUE(used_after_free < used_after_alloc, "Used should decrease after free");
+}
+
+void test_heap_free_reuse_and_coalesce() {
+    // Allocate three adjacent blocks
+    void* a = kmalloc(256);
+    void* b = kmalloc(256);
+    void* c = kmalloc(256);
+    TEST_ASSERT_NOT_NULL(a, "A alloc");
+    TEST_ASSERT_NOT_NULL(b, "B alloc");
+    TEST_ASSERT_NOT_NULL(c, "C alloc");
+
+    // Free middle and ensure reuse
+    kfree(b);
+    void* d = kmalloc(200);
+    TEST_ASSERT_NOT_NULL(d, "D alloc in freed B");
+    TEST_ASSERT_EQUAL((int)(uintptr_t)b, (int)(uintptr_t)d, "Allocator should reuse freed middle block");
+
+    // Free neighbors and the reused block to test coalescing
+    kfree(a);
+    kfree(c);
+    kfree(d);
+
+    // Now a large allocation should fit in the coalesced region starting at A
+    void* e = kmalloc(700);
+    TEST_ASSERT_NOT_NULL(e, "Large allocation after coalesce");
+    TEST_ASSERT_EQUAL((int)(uintptr_t)a, (int)(uintptr_t)e, "Coalesced block should start at A");
+    kfree(e);
+}
+
 void test_cpp_new_delete() {
     uint64_t core_id = getCoreID();
     printf("\n  Core %lld: Testing C++ new/delete operators", core_id);
@@ -442,6 +481,8 @@ void register_all_tests() {
     MANUAL_REGISTER_TEST(test_heap_alignment);
     MANUAL_REGISTER_TEST(test_heap_statistics);
     MANUAL_REGISTER_TEST(test_heap_boundary_conditions);
+    MANUAL_REGISTER_TEST(test_heap_free_reduces_used);
+    MANUAL_REGISTER_TEST(test_heap_free_reuse_and_coalesce);
     
     // C++ operator tests
     MANUAL_REGISTER_TEST(test_cpp_new_delete);

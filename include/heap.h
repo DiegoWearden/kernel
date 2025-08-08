@@ -12,6 +12,12 @@ void heap_init();
 // Simple bump allocator - allocate memory
 void* kmalloc(size_t size);
 
+// Deallocate previously allocated memory
+void kfree(void* ptr);
+
+// Optionally expand the heap by at least min_bytes; returns number of bytes added
+size_t heap_expand(size_t min_bytes);
+
 // Get current heap usage statistics
 size_t get_heap_used();
 size_t get_heap_free();
