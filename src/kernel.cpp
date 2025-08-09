@@ -8,6 +8,9 @@
 #include "vm.h"
 #include "atomic.h"
 #include "dcache.h"
+#include "testframework.h"
+#include "heap.h"
+#include "core.h"
 
 struct Stack {
     static constexpr int BYTES = 4096;
@@ -16,22 +19,24 @@ struct Stack {
 
 PerCPU<Stack> stacks;
 
+static bool allowStackInit = false;
 static bool smpInitDone = false;
-static bool null_protection_enabled = false;
 
+static Barrier* starting = nullptr;
+static Barrier* stopping = nullptr;
 
 void kernel_init();
+
+extern void register_all_tests();
 
 SpinLock lock;
 
 extern "C" uint64_t pickKernelStack(void) {
-    return (uint64_t) &stacks.forCPU(smpInitDone ? getCoreID() : 0).bytes[Stack::BYTES];
+    return (uint64_t) &stacks.forCPU(allowStackInit ? getCoreID() : 0).bytes[Stack::BYTES];
 }
 
-
-
 extern "C" void secondary_kernel_init(){
-    while(!null_protection_enabled);
+    while(!smpInitDone);
     init_mmu();
     kernel_init();
 }
@@ -39,45 +44,49 @@ extern "C" void secondary_kernel_init(){
 extern "C" void primary_kernel_init() {
     create_page_tables();
     patch_page_tables();
+
+    // Wake up secondary cores via spin tables before enabling MMU
+    allowStackInit = true;
+    clean_dcache_line(&allowStackInit);
+    wake_up_cores();
+
     init_mmu();
+
     uart_init();
     init_printf(nullptr, uart_putc_wrapper);
     printf("printf initialized!!!\n");
-    
-        // Initialize heap
+
+    heap_init();
+    printf("Heap allocator initialized!\n");
+
+    starting = new Barrier(CORE_COUNT);
+    stopping = new Barrier(CORE_COUNT);
+
+    // Signal secondaries it's safe to enable MMU on their side
     smpInitDone = true;
     clean_dcache_line(&smpInitDone);
-    wake_up_cores();
-    enable_null_pointer_protection();
-    null_protection_enabled = true;
-    clean_dcache_line(&null_protection_enabled);
+
     kernel_init();
 }
 
 void kernel_init(){
-    lock.lock();
-    printf("Hi, I'm core %d\n", getCoreID());
-    printf("in EL: %d\n", get_el());
-    printf("Stack Pointer: %llx\n", get_sp());
+    starting->sync();
+    uint64_t core_id = getCoreID();
+    lock.lock();    
+    printf("\n=== CORE %lld: STARTING MULTI-CORE KERNEL TESTS ===\n", core_id);
+    printf("Each core will run the same comprehensive test suite...\n");
+    printf("Note: Memory protection tests may cause expected page faults\n\n");
+    register_all_tests();
+    printf("=== CORE %lld: RUNNING TESTS ===\n", core_id);
+    
+    TestFramework::run_all_tests();
+
+    printf("\n=== CORE %lld: ALL TESTS COMPLETED ===\n", core_id);
+    printf("Core %lld entering idle state.\n\n", core_id);
     lock.unlock();
-    if(getCoreID() == 0){
-        uint64_t* null_ptr = (uint64_t*)0x0;
-        *null_ptr = 0xDEADBEEF;
-    }
-    if(getCoreID() == 1){
-        uint64_t* null_ptr = (uint64_t*)0xf0;
-        *null_ptr = 0xDEADBEEF;
-    }
-    if(getCoreID() == 2){
-        uint64_t* null_ptr = (uint64_t*)0xe8;
-        *null_ptr = 0xDEADBEEF;
-    }
-    if(getCoreID() == 3){
-        uint64_t* null_ptr = (uint64_t*)0xe0;
-        *null_ptr = 0xDEADBEEF;
-    }
+    stopping->sync();
+
     while(true) {
         asm volatile("wfe");
     }
 }
-

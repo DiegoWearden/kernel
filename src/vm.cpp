@@ -85,6 +85,11 @@ static inline uint64_t get_memory_attributes(uint64_t phys_addr) {
     return PTE_SHARED | PTE_AP_RW | PTE_ATTRINDX_NORMAL;
 }
 
+// Export a helper for normal cached page attributes for heap expansion
+uint64_t vm_get_normal_page_attrs() {
+    return PTE_SHARED | PTE_AP_RW | PTE_ATTRINDX_NORMAL;
+}
+
 // Map a 2MB block
 bool map_address_2mb(uint64_t virt_addr, uint64_t phys_addr, uint64_t attrs) {
     const uint64_t BLOCK_SIZE = 2 * 1024 * 1024;
@@ -200,26 +205,29 @@ bool unmap_address(uint64_t virt_addr) {
     uint64_t pte_index = (virt_addr >> 12) & 0x1FF;
 
     // Level 0
-    if (!(PGD[pgd_index] & PTE_VALID))
+    if (!(PGD[pgd_index] & PTE_VALID)){
         return false; // nothing mapped
+    }
 
     uint64_t* pud_table = (uint64_t*)(PGD[pgd_index] & ~0xFFF);
-    if (!(pud_table[pud_index] & PTE_VALID))
+    if (!(pud_table[pud_index] & PTE_VALID)){
         return false;
-
+    }
     // Level 1
     uint64_t* pmd_table = (uint64_t*)(pud_table[pud_index] & ~0xFFF);
     uint64_t pmd_entry = pmd_table[pmd_index];
-    if (!(pmd_entry & PTE_VALID))
+    if (!(pmd_entry & PTE_VALID)){
         return false;
+    }
 
     if ((pmd_entry & PTE_TABLE) == 0) {
         pmd_table[pmd_index] = 0;
         clean_and_invalidate_dcache_line(pmd_table); 
     } else {
         uint64_t* pte_table = (uint64_t*)(pmd_entry & ~0xFFF);
-        if (!(pte_table[pte_index] & PTE_VALID))
+        if (!(pte_table[pte_index] & PTE_VALID)){
             return false;
+        }
 
         pte_table[pte_index] = 0;
 
@@ -266,13 +274,8 @@ void create_page_tables() {
     }
 
     
-    // Map the first 2MB of memory in 4kb pages, we will unmap the first 4kb page later to enable null pointer protection
-    // but we need to map it first to wake up the cores since we need to use the mailbox registers that are in the first 4kb page
-    // TODO: there might be a better way to do this where we can wake up the cores without ever having to map the first 4kb page, but this works for now
-    // possible idea: we could pre populate the spin table with the physical addresses of the secondary cores, 
-    // and then just send SEV once the primary core has the mmu enabled, but this would require a way to get the physical addresses of the secondary cores
-    // and we would need to make sure that the spin table is properly aligned and that the secondary cores are able to jump to the correct address
-    for (uint64_t virt_addr = 0x0; virt_addr < 0x200000; virt_addr += PAGE_SIZE_4KB) {
+    // We skip the first 4kb page to enable null pointer protection
+    for (uint64_t virt_addr = 0x0 + PAGE_SIZE_4KB; virt_addr < 0x200000; virt_addr += PAGE_SIZE_4KB) {
         map_address_4kb(virt_addr, virt_addr, get_memory_attributes(virt_addr));
     }
     

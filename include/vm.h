@@ -89,6 +89,8 @@ bool map_4kb(uint64_t virt_addr, uint64_t phys_addr, uint64_t attrs);
 #define PAGE_SIZE_4KB    0x1000      // 4KB
 #define PAGE_SIZE_2MB    0x200000    // 2MB
 
+// I will expose a helper to get normal cached memory attributes for new mappings (heap expansion)
+uint64_t vm_get_normal_page_attrs();
 
 #endif /*__ASSEMBLER__*/
 #endif /*_VM_H*/

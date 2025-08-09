@@ -1,6 +1,8 @@
 #ifndef CORE_H
 #define CORE_H
 
+#define CORE_COUNT 4
+
 #ifdef __cplusplus
 extern "C" {
 #endif

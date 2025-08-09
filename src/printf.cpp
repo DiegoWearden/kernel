@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 #include "atomic.h"
 #include "uart.h"
+#include "stdint.h"
 
 typedef void (*putcf)(void*, char);
 static putcf stdout_putf;
@@ -167,6 +168,15 @@ void tfp_format(void* putp, void (*putf)(void*, char), const char* fmt, va_list 
         }
         int long_flag = 0;      // flag for 'l'
         int longlong_flag = 0;  // flag for 'll'
+        int size_flag = 0;      // flag for 'z' (size_t)
+        
+        // Handle 'z' modifier for size_t
+        if (*fmt == 'z') {
+            fmt++;
+            size_flag = 1;
+        }
+        
+        // Handle 'l' and 'll' modifiers
         while (*fmt == 'l') {
             fmt++;
             if (long_flag) longlong_flag = 1;
@@ -180,7 +190,9 @@ void tfp_format(void* putp, void (*putf)(void*, char), const char* fmt, va_list 
                 break;
             }
             case 'd': {
-                if (longlong_flag)
+                if (size_flag)
+                    printi(putp, putf, va_arg(va, size_t), 10, 1, width, pad, 'a');
+                else if (longlong_flag)
                     printi(putp, putf, va_arg(va, long long), 10, 1, width, pad, 'a');
                 else if (long_flag)
                     printi(putp, putf, va_arg(va, long), 10, 1, width, pad, 'a');
@@ -189,7 +201,9 @@ void tfp_format(void* putp, void (*putf)(void*, char), const char* fmt, va_list 
                 break;
             }
             case 'u': {
-                if (longlong_flag)
+                if (size_flag)
+                    printi(putp, putf, va_arg(va, size_t), 10, 0, width, pad, 'a');
+                else if (longlong_flag)
                     printi(putp, putf, va_arg(va, unsigned long long), 10, 0, width, pad, 'a');
                 else if (long_flag)
                     printi(putp, putf, va_arg(va, unsigned long), 10, 0, width, pad, 'a');
@@ -198,7 +212,9 @@ void tfp_format(void* putp, void (*putf)(void*, char), const char* fmt, va_list 
                 break;
             }
             case 'x': {
-                if (longlong_flag)
+                if (size_flag)
+                    printi(putp, putf, va_arg(va, size_t), 16, 0, width, pad, 'a');
+                else if (longlong_flag)
                     printi(putp, putf, va_arg(va, unsigned long long), 16, 0, width, pad, 'a');
                 else if (long_flag)
                     printi(putp, putf, va_arg(va, unsigned long), 16, 0, width, pad, 'a');
@@ -207,7 +223,9 @@ void tfp_format(void* putp, void (*putf)(void*, char), const char* fmt, va_list 
                 break;
             }
             case 'X': {
-                if (longlong_flag)
+                if (size_flag)
+                    printi(putp, putf, va_arg(va, size_t), 16, 0, width, pad, 'A');
+                else if (longlong_flag)
                     printi(putp, putf, va_arg(va, unsigned long long), 16, 0, width, pad, 'A');
                 else if (long_flag)
                     printi(putp, putf, va_arg(va, unsigned long), 16, 0, width, pad, 'A');

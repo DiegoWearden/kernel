@@ -1,6 +1,13 @@
 #ifndef __TFP_PRINTF__
 #define __TFP_PRINTF__
 
+/*
+ * Kernel printf implementation with support for:
+ * - Basic format specifiers: %d, %u, %x, %X, %c, %s
+ * - Length modifiers: %l (long), %ll (long long), %z (size_t)
+ * - Examples: %zu (size_t), %zx (size_t hex), %lld (long long)
+ */
+
 #include <stdarg.h>
 
 void init_printf(void* putp, void (*putf)(void*, char));

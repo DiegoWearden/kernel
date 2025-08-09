@@ -67,6 +67,7 @@ static inline void monitor(uintptr_t addr) {
 //     }
 // };
 
+
 template <typename T>
 class Atomic {
     volatile T value;
@@ -118,6 +119,20 @@ class Atomic<int64_t> {
    public:
     Atomic() = delete;
     Atomic(int64_t) = delete;
+};
+
+class Barrier {
+    Atomic<uint32_t> counter;
+public:
+    Barrier(uint32_t counter): counter(counter) {}
+    Barrier(const Barrier&) = delete;
+
+    void sync() {
+        counter.add_fetch(-1);
+	    while (counter.get() != 0) {
+        asm volatile("wfe");
+        }
+    }
 };
 
 /*
