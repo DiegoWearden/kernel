@@ -10,6 +10,7 @@
 #include "dcache.h"
 #include "test.h"
 #include "heap.h"
+#include "core.h"
 
 struct Stack {
     static constexpr int BYTES = 4096;
@@ -20,6 +21,9 @@ PerCPU<Stack> stacks;
 
 static bool allowStackInit = false;
 static bool smpInitDone = false;
+
+static Barrier* starting = nullptr;
+static Barrier* stopping = nullptr;
 
 void kernel_init();
 
@@ -55,6 +59,9 @@ extern "C" void primary_kernel_init() {
     heap_init();
     printf("Heap allocator initialized!\n");
 
+    starting = new Barrier(CORE_COUNT);
+    stopping = new Barrier(CORE_COUNT);
+
     // Signal secondaries it's safe to enable MMU on their side
     smpInitDone = true;
     clean_dcache_line(&smpInitDone);
@@ -63,12 +70,12 @@ extern "C" void primary_kernel_init() {
 }
 
 void kernel_init(){
+    starting->sync();
     uint64_t core_id = getCoreID();
     lock.lock();    
     printf("\n=== CORE %lld: STARTING MULTI-CORE KERNEL TESTS ===\n", core_id);
     printf("Each core will run the same comprehensive test suite...\n");
     printf("Note: Memory protection tests may cause expected page faults\n\n");
-    
     register_all_tests();
     printf("=== CORE %lld: RUNNING TESTS ===\n", core_id);
     
@@ -77,7 +84,7 @@ void kernel_init(){
     printf("\n=== CORE %lld: ALL TESTS COMPLETED ===\n", core_id);
     printf("Core %lld entering idle state.\n\n", core_id);
     lock.unlock();
-    
+    stopping->sync();
 
     while(true) {
         asm volatile("wfe");

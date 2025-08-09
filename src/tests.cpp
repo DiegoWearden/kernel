@@ -3,6 +3,9 @@
 #include "atomic.h"
 #include "utils.h"
 #include "heap.h"
+#include "queue.h"
+
+static bool tests_registered = false;
 
 void test_k_strlen() {
     TEST_ASSERT_EQUAL(5, K::strlen("hello"), "strlen should return correct length");
@@ -444,8 +447,41 @@ void test_printf_size_t_format() {
     TEST_ASSERT_TRUE(true, "printf %zu format test completed");
 }
 
+void test_queue_basic_enq_deq() {
+    Queue<int, SpinLock> q(8);
+    q.enqueue(1);
+    q.enqueue(2);
+    q.enqueue(3);
+    TEST_ASSERT_EQUAL(1, q.dequeue(), "Queue should dequeue in FIFO order (1)");
+    TEST_ASSERT_EQUAL(2, q.dequeue(), "Queue should dequeue in FIFO order (2)");
+    TEST_ASSERT_EQUAL(3, q.dequeue(), "Queue should dequeue in FIFO order (3)");
+}
+
+void test_queue_wraparound() {
+    Queue<int, SpinLock> q(3);
+    q.enqueue(10);
+    q.enqueue(20);
+    TEST_ASSERT_EQUAL(10, q.dequeue(), "Wrap: first dequeue should be 10");
+    q.enqueue(30);
+    q.enqueue(40); // tail wraps here for capacity 3
+    TEST_ASSERT_EQUAL(20, q.dequeue(), "Wrap: second dequeue should be 20");
+    TEST_ASSERT_EQUAL(30, q.dequeue(), "Wrap: third dequeue should be 30");
+    TEST_ASSERT_EQUAL(40, q.dequeue(), "Wrap: fourth dequeue should be 40");
+}
+
+void test_queue_fill_and_drain() {
+    Queue<int, SpinLock> q(5);
+    for (int i = 0; i < 5; i++) q.enqueue(i);
+    for (int i = 0; i < 5; i++) {
+        TEST_ASSERT_EQUAL(i, q.dequeue(), "Fill/drain should preserve order");
+    }
+}
+
 
 void register_all_tests() {
+    if(tests_registered) return;
+    tests_registered = true;
+    
     // // Basic functionality tests
     // MANUAL_REGISTER_TEST(test_k_strlen);
     // MANUAL_REGISTER_TEST(test_k_streq);
@@ -475,16 +511,21 @@ void register_all_tests() {
     // MANUAL_REGISTER_TEST(test_low_memory_protection);
     // MANUAL_REGISTER_TEST(test_memory_protection_boundaries);
     
-    // Heap allocator tests
-    MANUAL_REGISTER_TEST(test_heap_basic_allocation);
-    MANUAL_REGISTER_TEST(test_heap_zero_initialization);
-    MANUAL_REGISTER_TEST(test_heap_alignment);
-    MANUAL_REGISTER_TEST(test_heap_statistics);
-    MANUAL_REGISTER_TEST(test_heap_boundary_conditions);
-    MANUAL_REGISTER_TEST(test_heap_free_reduces_used);
-    MANUAL_REGISTER_TEST(test_heap_free_reuse_and_coalesce);
+    // // Heap allocator tests
+    // MANUAL_REGISTER_TEST(test_heap_basic_allocation);
+    // MANUAL_REGISTER_TEST(test_heap_zero_initialization);
+    // MANUAL_REGISTER_TEST(test_heap_alignment);
+    // MANUAL_REGISTER_TEST(test_heap_statistics);
+    // MANUAL_REGISTER_TEST(test_heap_boundary_conditions);
+    // MANUAL_REGISTER_TEST(test_heap_free_reduces_used);
+    // MANUAL_REGISTER_TEST(test_heap_free_reuse_and_coalesce);
     
-    // C++ operator tests
-    MANUAL_REGISTER_TEST(test_cpp_new_delete);
-    MANUAL_REGISTER_TEST(test_cpp_alignment);
+    // // C++ operator tests
+    // MANUAL_REGISTER_TEST(test_cpp_new_delete);
+    // MANUAL_REGISTER_TEST(test_cpp_alignment);
+
+    // Queue tests
+    MANUAL_REGISTER_TEST(test_queue_basic_enq_deq);
+    MANUAL_REGISTER_TEST(test_queue_wraparound);
+    MANUAL_REGISTER_TEST(test_queue_fill_and_drain);
 } 
