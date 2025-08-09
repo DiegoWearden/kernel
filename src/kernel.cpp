@@ -8,7 +8,7 @@
 #include "vm.h"
 #include "atomic.h"
 #include "dcache.h"
-#include "test.h"
+#include "testframework.h"
 #include "heap.h"
 #include "core.h"
 
