@@ -34,6 +34,7 @@ extern "C" unsigned int mailbox_read(unsigned char channel) {
 
 extern "C" unsigned int gpu_convert_address(void* addr) {
     unsigned long p = (unsigned long)addr;
+    // convert to physical address if not already
     if(p >= VA_START){
         p -= VA_START;
     }
