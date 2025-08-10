@@ -11,7 +11,7 @@ class Queue{
     public:
         Queue(int capacity){
             this->capacity = capacity;
-            this->data = new int[capacity];
+            this->data = new T[capacity];
             this->head = 0;
             this->tail = 0;
             this->size = 0;
@@ -27,24 +27,31 @@ class Queue{
             this->size = 0;
         };
 
-        void enqueue(int value){
+        void enqueue(const T& value){
             LockGuard g{this->lock};
             K::assert(size < capacity, "Queue::enqueue: queue is full");
             this->data[this->tail] = value;
             this->tail = (this->tail + 1) % this->capacity;
             this->size++;
         }
-        int dequeue(){
+        T dequeue(){
             LockGuard g{this->lock};
             K::assert(size > 0, "Queue::dequeue: queue is empty");
-            int value = this->data[this->head];
+            T value = this->data[this->head];
             this->head = (this->head + 1) % capacity;
             this->size--;
             return value;
         }
 
+        bool empty(){
+            return this->size == 0;
+        }
+        int count(){
+            return this->size;
+        }
+
     private:
-    int* data;
+    T* data;
     int head;
     int tail;
     int size;
