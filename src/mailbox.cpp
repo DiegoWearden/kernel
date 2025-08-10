@@ -37,7 +37,8 @@ extern "C" unsigned int gpu_convert_address(void* addr) {
     if(p >= VA_START){
         p -= VA_START;
     }
-    // set gpu alias as 0xC0000000 which is the direct uncached alias
+    // set gpu alias as 0xC0000000 which is the direct uncached alias, look at page 5 of
+    // https://datasheets.raspberrypi.com/bcm2835/bcm2835-peripherals.pdf for more details
     return p | 0xC0000000u;
 }
 
