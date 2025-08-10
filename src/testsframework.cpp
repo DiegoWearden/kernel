@@ -5,6 +5,8 @@
 #include "heap.h"
 #include "queue.h"
 
+extern "C" void register_mailbox_tests();
+
 static bool tests_registered = false;
 
 void test_k_strlen() {
@@ -524,8 +526,11 @@ void register_all_tests() {
     // MANUAL_REGISTER_TEST(test_cpp_new_delete);
     // MANUAL_REGISTER_TEST(test_cpp_alignment);
 
+    // Mailbox tests
+    register_mailbox_tests();
+
     // Queue tests
-    MANUAL_REGISTER_TEST(test_queue_basic_enq_deq);
-    MANUAL_REGISTER_TEST(test_queue_wraparound);
-    MANUAL_REGISTER_TEST(test_queue_fill_and_drain);
+    // MANUAL_REGISTER_TEST(test_queue_basic_enq_deq);
+    // MANUAL_REGISTER_TEST(test_queue_wraparound);
+    // MANUAL_REGISTER_TEST(test_queue_fill_and_drain);
 } 

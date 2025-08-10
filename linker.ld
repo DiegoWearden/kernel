@@ -26,6 +26,10 @@ SECTIONS
         __bss_end = .;
     }
 
+    .mailbox : ALIGN(16) {
+        KEEP(*(.mailbox))
+    }
+
     _end = .;
 
     /* Heap section - configurable size */
