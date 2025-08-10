@@ -13,7 +13,7 @@
 #include "core.h"
 
 struct Stack {
-    static constexpr int BYTES = 4096;
+    static constexpr int BYTES = 16 * 1024; // 16KB
     uint64_t bytes[BYTES] __attribute__ ((aligned(16)));
 };
 
@@ -70,6 +70,9 @@ extern "C" void primary_kernel_init() {
 }
 
 void kernel_init(){
+    lock.lock();
+    printf("Stack pointer for core %lld: 0x%llx\n", getCoreID(), (uint64_t)get_sp());
+    lock.unlock();
     starting->sync();
     uint64_t core_id = getCoreID();
     lock.lock();    
