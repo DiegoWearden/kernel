@@ -12,10 +12,12 @@
 #include "heap.h"
 #include "core.h"
 #include "tcb.h"
+#include "sched.h"
 
-struct Stack {
+struct Stack
+{
     static constexpr int BYTES = STACK_SIZE; // 16KB
-    uint64_t bytes[BYTES] __attribute__ ((aligned(16)));
+    uint64_t bytes[BYTES] __attribute__((aligned(16)));
 };
 
 PerCPU<Stack> stacks;
@@ -23,8 +25,8 @@ PerCPU<Stack> stacks;
 static bool allowStackInit = false;
 static bool smpInitDone = false;
 
-static Barrier* starting = nullptr;
-static Barrier* stopping = nullptr;
+static Barrier *starting = nullptr;
+static Barrier *stopping = nullptr;
 
 void kernel_init();
 
@@ -32,17 +34,21 @@ extern void register_all_tests();
 
 SpinLock lock;
 
-extern "C" uint64_t pickKernelStack(void) {
-    return (uint64_t) &stacks.forCPU(allowStackInit ? getCoreID() : 0).bytes[Stack::BYTES];
+extern "C" uint64_t pickKernelStack(void)
+{
+    return (uint64_t)&stacks.forCPU(allowStackInit ? getCoreID() : 0).bytes[Stack::BYTES];
 }
 
-extern "C" void secondary_kernel_init(){
-    while(!smpInitDone);
+extern "C" void secondary_kernel_init()
+{
+    while (!smpInitDone)
+        ;
     init_mmu();
     kernel_init();
 }
 
-extern "C" void primary_kernel_init() {
+extern "C" void primary_kernel_init()
+{
     create_page_tables();
     patch_page_tables();
 
@@ -67,23 +73,36 @@ extern "C" void primary_kernel_init() {
     smpInitDone = true;
     clean_dcache_line(&smpInitDone);
 
+    // create dummy thread for the boot core
+    boot_tcb = new TCB([]{});
+
+    Thread t([]{
+        printf("hello!!!\n");
+        printf("Stack pointer for core %lld: 0x%llx\n", getCoreID(), (uint64_t)get_sp());
+        printf("tcb thread id: %lld\n", current->get_id());
+        yield();
+    });
+
+    TCB *tcb = new TCB(t);
+    start_thread(*tcb);
 
     kernel_init();
 }
 
-void kernel_init(){
+void kernel_init()
+{
     lock.lock();
-    printf("Stack pointer for core %lld: 0x%llx\n", getCoreID(), (uint64_t)get_sp());
+    printf("tcb thread id: %lld\n", current->get_id());
     lock.unlock();
     starting->sync();
     uint64_t core_id = getCoreID();
-    lock.lock();    
+    lock.lock();
     printf("\n=== CORE %lld: STARTING MULTI-CORE KERNEL TESTS ===\n", core_id);
     printf("Each core will run the same comprehensive test suite...\n");
     printf("Note: Memory protection tests may cause expected page faults\n\n");
     register_all_tests();
     printf("=== CORE %lld: RUNNING TESTS ===\n", core_id);
-    
+
     TestFramework::run_all_tests();
 
     printf("\n=== CORE %lld: ALL TESTS COMPLETED ===\n", core_id);
@@ -91,7 +110,8 @@ void kernel_init(){
     lock.unlock();
     stopping->sync();
 
-    while(true) {
+    while (true)
+    {
         asm volatile("wfe");
     }
 }
