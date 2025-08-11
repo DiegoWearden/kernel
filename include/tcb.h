@@ -13,18 +13,15 @@ class TCB {
         uint64_t* sp_bottom{nullptr};
         uint64_t* sp_top{nullptr};
         Thread thread{};
-        void allocateStack(){
-            size_t elements = stack_size / sizeof(uint64_t);
-            sp_bottom = new uint64_t[elements];
-            sp_top = ALIGN_PTR_DOWN_16(sp_bottom + elements);
-        }
 
     public:
         TCB(Thread thread, size_t stack_size = STACK_SIZE) : stack_size(stack_size), id(next_id.fetch_add(1)) {
             this->thread = thread;
             ASSERT(stack_size >= 1024, "Stack size must be at least 1024");
             ASSERT((stack_size % 16) == 0, "Stack size must be a multiple of 16");
-            allocateStack();
+            size_t elements = stack_size / sizeof(uint64_t);
+            sp_bottom = new uint64_t[elements];
+            sp_top = ALIGN_PTR_DOWN_16(sp_bottom + elements);
         }
         ~TCB(){
             delete[] sp_bottom;
