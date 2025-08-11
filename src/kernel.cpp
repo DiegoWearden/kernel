@@ -11,9 +11,10 @@
 #include "testframework.h"
 #include "heap.h"
 #include "core.h"
+#include "tcb.h"
 
 struct Stack {
-    static constexpr int BYTES = 16 * 1024; // 16KB
+    static constexpr int BYTES = STACK_SIZE; // 16KB
     uint64_t bytes[BYTES] __attribute__ ((aligned(16)));
 };
 
@@ -48,7 +49,7 @@ extern "C" void primary_kernel_init() {
     // Wake up secondary cores via spin tables before enabling MMU
     allowStackInit = true;
     clean_dcache_line(&allowStackInit);
-    wake_up_cores();
+    // wake_up_cores();
 
     init_mmu();
 
@@ -65,6 +66,7 @@ extern "C" void primary_kernel_init() {
     // Signal secondaries it's safe to enable MMU on their side
     smpInitDone = true;
     clean_dcache_line(&smpInitDone);
+
 
     kernel_init();
 }

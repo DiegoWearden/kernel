@@ -107,20 +107,6 @@ class Atomic {
     }
 };
 
-template <>
-class Atomic<uint64_t> {
-   public:
-    Atomic() = delete;
-    Atomic(uint64_t) = delete;
-};
-
-template <>
-class Atomic<int64_t> {
-   public:
-    Atomic() = delete;
-    Atomic(int64_t) = delete;
-};
-
 class Barrier {
     Atomic<uint32_t> counter;
 public:

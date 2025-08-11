@@ -2,6 +2,7 @@
 #define CORE_H
 
 #define CORE_COUNT 4
+#define STACK_SIZE 16 * 1024
 
 #ifdef __cplusplus
 extern "C" {
