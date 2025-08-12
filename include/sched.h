@@ -14,3 +14,4 @@ extern "C" void context_switch(CpuContext* save, CpuContext* restore);
 void schedInit();
 void schedule(TCB* tcb);
 void yield();
+void exit();

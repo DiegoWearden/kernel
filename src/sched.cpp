@@ -10,14 +10,14 @@ extern "C" void trampoline();
 
 extern "C" void trampoline(){
     current->get_thread().run();
-    yield();
+    exit();
 }
 
 void schedInit(){
     if(!readyQueue){
         readyQueue = new Queue<TCB*, SpinLock>(256);
     }
-    // dummy tcb for boot core
+    // dummy thread for boot core
     current = new TCB([]{});
 }
 
@@ -31,8 +31,14 @@ void yield(){
     if(!next){
         return;
     }
-    TCB* prev = current;
+    TCB* oldCurrent = current;
     current = next;
-    context_switch(prev->get_context(), next->get_context());
-    printf("thread id %d has run again\n", current->get_id());
+    context_switch(oldCurrent->get_context(), next->get_context());
+    printf("thread running again: %d\n", current->get_id());
+}
+
+void exit(){
+    while(1){
+        yield();
+    }
 }

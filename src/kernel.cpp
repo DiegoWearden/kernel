@@ -102,6 +102,7 @@ void kernel_init()
 {
     lock.lock();
     printf("tcb thread id: %lld\n", current->get_id());
+    yield();
     lock.unlock();
     starting->sync();
     uint64_t core_id = getCoreID();
