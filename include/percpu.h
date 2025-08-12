@@ -1,9 +1,10 @@
 #include "utils.h"
+#include "core.h"
 
 template<class T>
 class PerCPU {
 private:
-    T data[4];
+    T data[CORE_COUNT];
 public:
     inline T& forCPU(int id) {
         return data[id];

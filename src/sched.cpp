@@ -1,22 +1,38 @@
 #include "tcb.h"
 #include "sched.h"
 
+static Queue<TCB*, SpinLock>* readyQueue = nullptr;
+
 TCB* current = nullptr;
-TCB* boot_tcb = nullptr;
 
 extern "C" void context_switch(CpuContext* save, CpuContext* restore);
 extern "C" void trampoline();
 
 extern "C" void trampoline(){
     current->get_thread().run();
-    context_switch(current->get_context(), boot_tcb->get_context());
+    yield();
 }
 
-void start_thread(TCB& tcb){
-    current = &tcb;
-    context_switch(boot_tcb->get_context(), current->get_context());
+void schedInit(){
+    if(!readyQueue){
+        readyQueue = new Queue<TCB*, SpinLock>(256);
+    }
+    // dummy tcb for boot core
+    current = new TCB([]{});
+}
+
+void schedule(TCB* tcb){
+    readyQueue->enqueue(tcb);
 }
 
 void yield(){
-    context_switch(current->get_context(), boot_tcb->get_context());
+    readyQueue->enqueue(current);
+    TCB* next = readyQueue->dequeue();
+    if(!next){
+        return;
+    }
+    TCB* prev = current;
+    current = next;
+    context_switch(prev->get_context(), next->get_context());
+    printf("thread id %d has run again\n", current->get_id());
 }

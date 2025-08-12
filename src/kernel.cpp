@@ -73,18 +73,27 @@ extern "C" void primary_kernel_init()
     smpInitDone = true;
     clean_dcache_line(&smpInitDone);
 
-    // create dummy thread for the boot core
-    boot_tcb = new TCB([]{});
+    schedInit();
 
     Thread t([]{
         printf("hello!!!\n");
         printf("Stack pointer for core %lld: 0x%llx\n", getCoreID(), (uint64_t)get_sp());
         printf("tcb thread id: %lld\n", current->get_id());
-        yield();
+    });
+
+    Thread t2([]{
+        printf("hello!!!\n");
+        printf("Stack pointer for core %lld: 0x%llx\n", getCoreID(), (uint64_t)get_sp());
+        printf("tcb thread id: %lld\n", current->get_id());
     });
 
     TCB *tcb = new TCB(t);
-    start_thread(*tcb);
+    schedule(tcb);
+
+    TCB *tcb2 = new TCB(t2);
+    schedule(tcb2);
+
+    yield();
 
     kernel_init();
 }
